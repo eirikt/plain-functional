@@ -6,9 +6,11 @@ import org.junit.jupiter.api.Test;
 
 import static land.plainfunctional.functor.Maybe.just;
 import static land.plainfunctional.functor.Maybe.nothing;
+import static land.plainfunctional.functor.Maybe.of;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class MaybeTests {
+class MaybeSpecs {
 
     ///////////////////////////////////////////////////////////////////////////
     // Maybe semantics
@@ -18,21 +20,32 @@ class MaybeTests {
     void shouldEncapsulateValues() {
         Maybe<Integer> maybe3 = just(3);
         assertThat(maybe3.isNothing()).isFalse();
+
+        assertThat(maybe3).isNotSameAs(just(3));
+        assertThat(maybe3).isEqualTo(just(3));
     }
 
     @Test
-    void shouldEncapsulateNulls() {
-        Maybe<Integer> maybe = just(null);
-        assertThat(maybe.isNothing()).isTrue();
+    void whenJustIsNullValue_shouldThrowException() {
+        assertThatThrownBy(
+            () -> just(null)
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a null value");
     }
 
     @Test
-    void shouldHaveNothing() {
-        Maybe<Integer> maybe = nothing();
-        assertThat(maybe.isNothing()).isTrue();
+    void shouldEncapsulateNothing() {
+        Maybe<Integer> nothing = nothing();
+        assertThat(nothing.isNothing()).isTrue();
 
-        assertThat(maybe).isNotSameAs(nothing());
-        assertThat(maybe).isEqualTo(nothing());
+        assertThat(nothing).isNotSameAs(nothing());
+        assertThat(nothing).isEqualTo(nothing());
+    }
+
+    @Test
+    void shouldEncapsulateNullValuesViaFactoryMethod() {
+        Maybe<Integer> maybe = of(null);
+        assertThat(maybe.isNothing()).isTrue();
     }
 
 
@@ -112,6 +125,8 @@ class MaybeTests {
         Maybe<Integer> F1 = maybe.map(g.compose(f));
         Maybe<Integer> F2 = maybe.map(f).map(g);
 
+        // TODO: Decide!
+        //assertThat(F1).isSameAs(F2);
         assertThat(F1).isNotSameAs(F2);
         assertThat(F1).isEqualTo(F2);
 

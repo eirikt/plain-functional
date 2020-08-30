@@ -25,66 +25,60 @@ import land.plainfunctional.typeclass.Functor;
  */
 public class Maybe<T> implements Functor<T> {
 
-    public static <T> Maybe<T> just(T value) {
-        //throw new UnsupportedOperationException("Not yet implemented");
-        return new Maybe<>(value);
+    ///////////////////////////////////////////////////////////////////////////
+    // Factory methods
+    ///////////////////////////////////////////////////////////////////////////
+
+    public static <T> Maybe<T> of(T value) {
+        return value == null ? nothing() : just(value);
     }
 
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Data constructors
+    ///////////////////////////////////////////////////////////////////////////
+
     public static <T> Maybe<T> nothing() {
-        //throw new UnsupportedOperationException("Not yet implemented");
         return new Maybe<>(null);
     }
 
+    public static <T> Maybe<T> just(T value) {
+        if (value == null) {
+            throw new IllegalArgumentException("Cannot create a 'Maybe.Just' from a null value");
+        }
+        return new Maybe<>(value);
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // State
+    ///////////////////////////////////////////////////////////////////////////
+
     private final T value;
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Constructor
+    ///////////////////////////////////////////////////////////////////////////
 
     private Maybe(T value) {
         this.value = value;
     }
 
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Maybe methods
+    ///////////////////////////////////////////////////////////////////////////
+
     public boolean isNothing() {
-        //throw new UnsupportedOperationException("Not yet implemented");
         return value == null;
     }
 
-    //@Override
-    //public <U> Maybe<U> map(java.util.function.Function<? super T, ? extends U> function) {
-    //    throw new UnsupportedOperationException("Not yet implemented");
-    //}
 
-    /*
-    // WORKS!
-    @Override
-    public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
-        if (this.isNothing()) {
-            // Partial function, returning nothing/bottom
-            function = x -> null;
-        }
-        U result = function.apply(this.value);
-        return (result == null) ? nothing() : just(result);
-    }
-    */
-    /*
-    // WORKS!
-    @Override
-    public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
-        if (this.isNothing()) {
-            // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
-            return (Maybe<U>) this;
-        }
-        return just(function.apply(this.value));
-    }
-    */
-    /*
-    // WORKS!
-    @Override
-    public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
-        if (this.isNothing()) {
-            // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
-            return (Maybe<U>) NOTHING;
-        }
-        return just(function.apply(this.value));
-    }
-    */
+    ///////////////////////////////////////////////////////////////////////////
+    // Functor
+    ///////////////////////////////////////////////////////////////////////////
+
     @Override
     public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
         if (this.isNothing()) {
@@ -92,6 +86,11 @@ public class Maybe<T> implements Functor<T> {
         }
         return just(function.apply(this.value));
     }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // java.lang.Object
+    ///////////////////////////////////////////////////////////////////////////
 
     @Override
     public int hashCode() {
