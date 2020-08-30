@@ -1,17 +1,17 @@
 # Plain functional Java
 
-_**Disclaimer:** 
+_**Disclaimer:**
 I am not a functional programmer (yet), and took way too few math courses at university.
 I am just a seasoned application-level software developer still looking for better ways._
 
-After many years using object-oriented programming languages (OOP) in medium/large projects, 
+After many years using object-oriented programming languages (OOP) in medium/large projects,
 I am not happy with the current state of affairs.
 Problematic properties of OOP are things like concurrency (shared mutable state), reuse, and scalability in general.
 
 ---
 
 Functional programming concepts are powerful, yet so simple.
-For an intro to functional programming, go e.g. [here](https://functionalprogramming.now.sh/1-functions-and-values.html) &mdash;my own attempt of clarifying concepts and terms, from the ground up. 
+For an intro to functional programming, go e.g. [here](https://functionalprogramming.now.sh/1-functions-and-values.html) &mdash;my own attempt of clarifying concepts and terms, from the ground up.
 _NB! Still work in progress._
 
 ---
@@ -30,3 +30,13 @@ so hence the name "plain functional".
 The state of this little library is:
 Don't use this, use [Vavr](https://www.vavr.io) (or something in that ballpark) instead.
 But who knows, maybe this library develops into something that can be recommended in the future.
+
+---
+
+### Usage
+
+Generate Javadoc by:
+```cmd
+mvn javadoc:javadoc
+```
+Then open `/target/site/apidocs/index.html`
