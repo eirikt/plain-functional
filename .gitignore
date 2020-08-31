@@ -1,0 +1,15 @@
+# Always ignore
+.ssh
+
+# Ignore IDE/tools stuff
+.idea
+
+# Ignore logs
+
+# Ignore generated/derived stuff
+target
+
+# Ignore temporary stuff
+*_DRAFT
+
+# Ignore other development stuff
