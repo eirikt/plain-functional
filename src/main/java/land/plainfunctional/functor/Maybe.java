@@ -26,6 +26,13 @@ import land.plainfunctional.typeclass.Functor;
 public class Maybe<T> implements Functor<T> {
 
     ///////////////////////////////////////////////////////////////////////////
+    // Constants and unit values
+    ///////////////////////////////////////////////////////////////////////////
+
+    private static final Maybe<? extends Object> NOTHING = new Maybe<>(null);
+
+
+    ///////////////////////////////////////////////////////////////////////////
     // Factory methods
     ///////////////////////////////////////////////////////////////////////////
 
@@ -38,8 +45,9 @@ public class Maybe<T> implements Functor<T> {
     // Data constructors
     ///////////////////////////////////////////////////////////////////////////
 
+    @SuppressWarnings("unchecked") // 'NOTHING' is covariant
     public static <T> Maybe<T> nothing() {
-        return new Maybe<>(null);
+        return (Maybe<T>) NOTHING;
     }
 
     public static <T> Maybe<T> just(T value) {
@@ -107,7 +115,7 @@ public class Maybe<T> implements Functor<T> {
         if (other == null || getClass() != other.getClass()) {
             return false;
         }
-        Maybe<?> otherMaybe = (Maybe<?>) other;
+        Maybe<? extends Object> otherMaybe = (Maybe<? extends Object>) other;
 
         return new EqualsBuilder()
             .append(this.value, otherMaybe.value)

@@ -35,16 +35,19 @@ class MaybeSpecs {
 
     @Test
     void shouldEncapsulateNothing() {
-        Maybe<Integer> nothing = nothing();
+        Maybe<String> nothing = nothing();
         assertThat(nothing.isNothing()).isTrue();
+    }
 
-        assertThat(nothing).isNotSameAs(nothing());
-        assertThat(nothing).isEqualTo(nothing());
+    @Test
+    void shouldEncapsulateNothingAndRespectReferentialTransparent() {
+        Maybe<String> nothing = nothing();
+        assertThat(nothing).isSameAs(nothing());
     }
 
     @Test
     void shouldEncapsulateNullValuesViaFactoryMethod() {
-        Maybe<Integer> maybe = of(null);
+        Maybe<String> maybe = of(null);
         assertThat(maybe.isNothing()).isTrue();
     }
 
@@ -125,10 +128,7 @@ class MaybeSpecs {
         Maybe<Integer> F1 = maybe.map(g.compose(f));
         Maybe<Integer> F2 = maybe.map(f).map(g);
 
-        // TODO: Decide!
-        //assertThat(F1).isSameAs(F2);
-        assertThat(F1).isNotSameAs(F2);
-        assertThat(F1).isEqualTo(F2);
+        assertThat(F1).isSameAs(F2);
 
         assertThat(F1.isNothing()).isTrue();
         assertThat(F2.isNothing()).isTrue();
@@ -180,7 +180,6 @@ class MaybeSpecs {
         // id_F a
         Maybe<String> id_F_a = Function.<Maybe<String>>identity().apply(nothing());
 
-        assertThat(F_id_a).isNotSameAs(id_F_a);
-        assertThat(F_id_a).isEqualTo(id_F_a);
+        assertThat(F_id_a).isSameAs(id_F_a);
     }
 }
