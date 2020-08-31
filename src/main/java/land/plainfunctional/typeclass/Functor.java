@@ -1,12 +1,17 @@
 package land.plainfunctional.typeclass;
 
 /**
+ * <p>
  * <i>A <b>functor</b> is a value/values in a context.</i>
  * The context may be structural (e.g. a container of some kind), or semantical (e.g. "the value may or may not be present").
- *
+ * </p>
+ * <p>
  * In mathematics, a <i>functor</i> is a type of mapping between categories arising in category theory.
  * Functors can be thought of as <i>homomorphisms between categories</i>.
+ * </p>
+ * <p>
  * In abstract algebra, a <i>homomorphism is a structure-preserving mapping between two algebraic structures of the same kind</i>.
+ * </p>
  *
  * @param <T> The type of the value in the context, or, the type of the functor value, or just, the functor type
  * @see <a href="https://en.wikipedia.org/wiki/Functor_(functional_programming)">Functor (Wikipedia)</a>
