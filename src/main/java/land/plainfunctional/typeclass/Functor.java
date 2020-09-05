@@ -12,6 +12,9 @@ package land.plainfunctional.typeclass;
  * <p>
  * In abstract algebra, a <i>homomorphism is a structure-preserving mapping between two algebraic structures of the same kind</i>.
  * </p>
+ * <p>
+ * If ignoring the mathematical roots of this concept, this Java interface would maybe have been called <code>Mappable</code>.
+ * </p>
  *
  * @param <T> The type of the value in the context, or, the type of the functor value, or just, the functor type
  * @see <a href="https://en.wikipedia.org/wiki/Functor_(functional_programming)">Functor (Wikipedia)</a>

@@ -4,6 +4,8 @@ import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
+import land.plainfunctional.testdomain.vanillaecommerce.MutableCustomer;
+
 import static land.plainfunctional.functor.Maybe.just;
 import static land.plainfunctional.functor.Maybe.nothing;
 import static land.plainfunctional.functor.Maybe.of;
@@ -30,7 +32,7 @@ class MaybeSpecs {
         assertThatThrownBy(
             () -> just(null)
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a null value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
     }
 
     @Test
@@ -40,15 +42,47 @@ class MaybeSpecs {
     }
 
     @Test
-    void shouldEncapsulateNothingAndRespectReferentialTransparent() {
+    void shouldEncapsulateNothingAndRespectReferentialTransparency() {
         Maybe<String> nothing = nothing();
         assertThat(nothing).isSameAs(nothing());
     }
 
     @Test
-    void shouldEncapsulateNullValuesViaFactoryMethod() {
+    void shouldEncapsulateNullValuesViaFactoryMethodOnly() {
         Maybe<String> maybe = of(null);
         assertThat(maybe.isNothing()).isTrue();
+    }
+
+    /**
+     * @see <a href="http://blog.vavr.io/the-agonizing-death-of-an-astronaut/">Vavr blog</a>
+     */
+    @Test
+    void shouldPreserveComputationalContext() {
+        assertThatThrownBy(
+            () -> of("someString").map((ignored) -> (Integer) null)
+
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+    }
+
+    /**
+     * NB! Protecting the integrity of the values is the values' responsibility! Sorry!
+     *
+     * TODO:
+     * See the {@link land.plainfunctional.testdomain.vanillaecommerce} test package on examples how to do that.
+     */
+    @Test
+    void willMutateArgumentsIfAllowedToDoThat() {
+        MutableCustomer customer = new MutableCustomer();
+        customer.customerId = "Jon";
+
+        of(customer)
+            .map((c) -> {
+                c.customerId = "Lisa";
+                return c;
+            });
+
+        assertThat(customer.customerId).isEqualTo("Lisa");
     }
 
 
