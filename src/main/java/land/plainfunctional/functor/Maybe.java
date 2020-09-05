@@ -1,6 +1,7 @@
 package land.plainfunctional.functor;
 
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -36,6 +37,7 @@ import land.plainfunctional.typeclass.Functor;
  *            It is the same as the parametric type 'a' in the Haskell definition.
  * @see <a href="https://en.wikipedia.org/wiki/Option_type">Option type (Wikipedia)</a>
  * @see <a href="https://wiki.haskell.org/Constructor">Haskell constructors</a>
+ * @see <a href="https://en.wikipedia.org/wiki/Algebraic_data_type">Algebraic data types</a>
  */
 public class Maybe<T> implements Functor<T> {
 
@@ -50,6 +52,13 @@ public class Maybe<T> implements Functor<T> {
     // Factory methods
     ///////////////////////////////////////////////////////////////////////////
 
+    /**
+     * Trusted factory method.
+     * (As no {@link Maybe} yet exists, we are free to use either of the stat constructors.)
+     *
+     * @param value The value to be put into this {@link Maybe} functor
+     * @return A 'Nothing' if the given value is 'null', otherwise 'Just'
+     */
     public static <T> Maybe<T> of(T value) {
         return value == null ? nothing() : just(value);
     }
@@ -59,11 +68,17 @@ public class Maybe<T> implements Functor<T> {
     // Data constructors
     ///////////////////////////////////////////////////////////////////////////
 
+    /**
+     * <code>Nothing</code> data constructor.
+     */
     @SuppressWarnings("unchecked") // 'NOTHING' is covariant
     public static <T> Maybe<T> nothing() {
         return (Maybe<T>) NOTHING;
     }
 
+    /**
+     * <code>Just</code> data constructor.
+     */
     public static <T> Maybe<T> just(T value) {
         if (value == null) {
             throw new IllegalArgumentException("Cannot create a 'Maybe.Just' from a 'null' value");
@@ -92,8 +107,52 @@ public class Maybe<T> implements Functor<T> {
     // Maybe methods
     ///////////////////////////////////////////////////////////////////////////
 
+    /**
+     * @return 'true' if and only if the 'nothing' data constructor is used, otherwise 'true'
+     */
     public boolean isNothing() {
         return this.value == null;
+    }
+
+    /**
+     * <p>
+     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
+     * otherwise the given default value will be returned.
+     * </p>
+     * <p>
+     * This is a simple application of <code>fold</code>.
+     * </p>
+     *
+     * @param defaultValue The default value in case this is 'Nothing'
+     * @return this functor's value in case this is a 'Just'
+     */
+    public T getOrDefault(T defaultValue) {
+        return fold(
+            () -> defaultValue,
+            (ignored) -> this.value
+        );
+    }
+
+    /**
+     * <p>
+     * To <i>fold</i> a data structure means creating a new representation of this value.
+     * This will most often result in leaving the {@link Maybe} functor behind.
+     * </p>
+     * <p>
+     * In abstract algebra, this is known as a "catamorphism".
+     * A catamorphism deconstructs (destroys) a data structure,
+     * in contrast to the homomorphic preservation of data structures.
+     * </p>
+     *
+     * @param onNothing Supplier ("nullary" function/deferred constant) of the default value in case of 'Nothing'
+     * @param onJust    Function (unary) (the "catamorphism") to be applied to this functor's value in case it is a 'Just'
+     * @param <U>       The type of the folded/returning value
+     * @return the folded value
+     */
+    public <U> U fold(Supplier<U> onNothing, Function<? super T, ? extends U> onJust) {
+        return isNothing()
+            ? onNothing.get()
+            : onJust.apply(this.value);
     }
 
 

@@ -66,9 +66,9 @@ class MaybeSpecs {
     }
 
     /**
-     * NB! Protecting the integrity of the values is the values' responsibility! Sorry!
+     * NB! Avoiding mutating shared state is the application logic's responsibility! Sorry!
      *
-     * TODO:
+     * This may be accomplished e.g. via immutable domain classes.
      * See the {@link land.plainfunctional.testdomain.vanillaecommerce} test package on examples how to do that.
      */
     @Test
@@ -215,5 +215,48 @@ class MaybeSpecs {
         Maybe<String> id_F_a = Function.<Maybe<String>>identity().apply(nothing());
 
         assertThat(F_id_a).isSameAs(id_F_a);
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Fold (catamorphism) semantics
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Test
+    void shouldFoldViaPatternMatching_nothing() {
+        Maybe<String> maybe = of(null);
+
+        Integer stringLength =
+            maybe.map(String::length)
+                 .fold(
+                     () -> -1,
+                     (length) -> length
+                 );
+
+        assertThat(stringLength).isEqualTo(-1);
+    }
+
+    @Test
+    void getOrDefault_nothing() {
+        assertThat(of(null).getOrDefault("Nope")).isEqualTo("Nope");
+    }
+
+    @Test
+    void shouldFoldViaPatternMatching_just() {
+        Maybe<String> maybe = just("Three");
+
+        Integer stringLength =
+            maybe.map(String::length)
+                 .fold(
+                     () -> -1,
+                     (length) -> length
+                 );
+
+        assertThat(stringLength).isEqualTo(5);
+    }
+
+    @Test
+    void getOrDefault_just() {
+        assertThat(of("Three").getOrDefault("Nope")).isEqualTo("Three");
     }
 }

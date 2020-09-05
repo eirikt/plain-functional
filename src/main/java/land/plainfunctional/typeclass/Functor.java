@@ -1,9 +1,11 @@
 package land.plainfunctional.typeclass;
 
+import java.util.function.Function;
+
 /**
  * <p>
  * <i>A <b>functor</b> is a value/values in a context.</i>
- * The context may be structural (e.g. a container of some kind), or semantical (e.g. "the value may or may not be present").
+ * The context may range from being structural (e.g. a container of some kind), to being semantical (e.g. "the value may or may not be present").
  * </p>
  * <p>
  * In mathematics, a <i>functor</i> is a type of mapping between categories arising in category theory.
@@ -40,5 +42,5 @@ public interface Functor<T> {
      * @param <U>      The type of the codomain
      * @return the new/other functor
      */
-    <U> Functor<U> map(java.util.function.Function<? super T, ? extends U> function);
+    <U> Functor<U> map(Function<? super T, ? extends U> function);
 }
