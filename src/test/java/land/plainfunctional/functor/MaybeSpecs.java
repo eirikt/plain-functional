@@ -212,14 +212,14 @@ class MaybeSpecs {
     void shouldPutValuesInThisApplicativeFunctor() {
         Maybe<?> maybe = withMaybe().pure("JustDoIt");
 
-        assertThat(maybe.getOrNull()).isEqualTo("JustDoIt");
+        assertThat(maybe.tryGet()).isEqualTo("JustDoIt");
     }
 
     @Test
     void shouldPutTypedValuesInThisApplicativeFunctor() {
         Maybe<LocalDate> maybe = withMaybe(LocalDate.class).pure(LocalDate.of(2010, 10, 13));
 
-        assertThat(maybe.getOrNull()).isEqualTo(LocalDate.of(2010, 10, 13));
+        assertThat(maybe.tryGet()).isEqualTo(LocalDate.of(2010, 10, 13));
     }
 
     @Test
@@ -246,7 +246,7 @@ class MaybeSpecs {
         Maybe<Function<Integer, Integer>> maybePlus = just(appliedCurriedPlus);
         Maybe<Integer> maybeSum = just(3).apply(maybePlus);
 
-        assertThat(maybeSum.getOrNull()).isEqualTo(5);
+        assertThat(maybeSum.tryGet()).isEqualTo(5);
     }
 
     @Test
@@ -261,7 +261,7 @@ class MaybeSpecs {
         Maybe<Function<String, Integer>> maybeStringLength = just(appliedStringLength);
         Maybe<Integer> maybeSum = just("Three").apply(maybeStringLength);
 
-        assertThat(maybeSum.getOrNull()).isEqualTo(8);
+        assertThat(maybeSum.tryGet()).isEqualTo(8);
     }
 
 

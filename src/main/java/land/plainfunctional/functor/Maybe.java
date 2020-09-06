@@ -174,6 +174,26 @@ public class Maybe<T> implements Applicative<T> {
 
     /**
      * <p>
+     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
+     * otherwise throw a {@link NullPointerException} (a bottom value).
+     * </p>
+     * <p>
+     * This is also a very simple (and somewhat reckless) application of <code>fold</code>.
+     * </p>
+     *
+     * @return this functor's value in case this is a 'Just'
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
+     */
+    public T tryGet() {
+        return fold(
+            () -> { throw new NullPointerException(); },
+            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
+            (ignored) -> this.value
+        );
+    }
+
+    /**
+     * <p>
      * To <i>fold</i> a data structure means creating a new representation of this value.
      * This will most often result in leaving the {@link Maybe} functor behind.
      * </p>
