@@ -26,6 +26,7 @@ The differences stand out more clearly then.
 In this library [Haskell](https://www.haskell.org) concepts and terminology will be followed.
 Haskell again, has a strong mathematical foundation,
 so hence the name "plain functional".
+Also, that is why we are using (the good ol') Java 8 in this library&mdash;as we only need Java's [function type](https://en.wikipedia.org/wiki/Function_type).
 
 The state of this little library is:
 Don't use this, use [Vavr](https://www.vavr.io) (or something in that ballpark) instead.
@@ -34,6 +35,12 @@ But who knows, maybe this library develops into something that can be recommende
 ---
 
 ### Usage
+
+Build library artifact by:
+```cmd
+mvn clean install
+```
+Then `JAR` file in `/target`
 
 Generate Javadoc by:
 ```cmd

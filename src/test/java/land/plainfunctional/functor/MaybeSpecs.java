@@ -1,5 +1,6 @@
 package land.plainfunctional.functor;
 
+import java.time.LocalDate;
 import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
@@ -9,6 +10,7 @@ import land.plainfunctional.testdomain.vanillaecommerce.MutableCustomer;
 import static land.plainfunctional.functor.Maybe.just;
 import static land.plainfunctional.functor.Maybe.nothing;
 import static land.plainfunctional.functor.Maybe.of;
+import static land.plainfunctional.functor.Maybe.withMaybe;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -115,13 +117,9 @@ class MaybeSpecs {
         assertThat(F1).isNotSameAs(F2);
         assertThat(F1).isEqualTo(F2);
 
-        // TODO: Include?
-        //assertThat(F1.getOrDefault(0)).isEqualTo(3 + 13 - 5);
-        //assertThat(F2.getOrDefault(0)).isEqualTo(3 + 13 - 5);
-
-        // TODO: Include?
-        //assertThat(F1._unsafe()).isEqualTo(3 + 13 - 5);
-        //assertThat(F2._unsafe()).isEqualTo(3 + 13 - 5);
+        // Bonus
+        assertThat(F1.getOrDefault(0)).isEqualTo(3 + 13 - 5);
+        assertThat(F2.getOrDefault(0)).isEqualTo(3 + 13 - 5);
     }
 
     @Test
@@ -140,13 +138,9 @@ class MaybeSpecs {
         assertThat(F1).isNotSameAs(F2);
         assertThat(F1).isEqualTo(F2);
 
-        // TODO: Include?
-        //assertThat(F1.getOrDefault(0)).isEqualTo(2);
-        //assertThat(F2.getOrDefault(0)).isEqualTo(2);
-
-        // TODO: Include?
-        //assertThat(F1._unsafe()).isEqualTo(2);
-        //assertThat(F2._unsafe()).isEqualTo(2);
+        // Bonus
+        assertThat(F1.getOrDefault(0)).isEqualTo(2);
+        assertThat(F2.getOrDefault(0)).isEqualTo(2);
     }
 
     @Test
@@ -167,16 +161,12 @@ class MaybeSpecs {
         assertThat(F1.isNothing()).isTrue();
         assertThat(F2.isNothing()).isTrue();
 
-        // TODO: Include?
-        //assertThat(F1.getOrDefault(null)).isNull();
-        //assertThat(F2.getOrDefault(null)).isNull();
+        // Bonus
+        assertThat(F1.getOrDefault(null)).isNull();
+        assertThat(F2.getOrDefault(null)).isNull();
 
-        //assertThat(F1.getOrDefault(0)).isEqualTo(0);
-        //assertThat(F2.getOrDefault(0)).isEqualTo(0);
-
-        // TODO: Include?
-        //assertThat(F1._unsafe()).isNull();
-        //assertThat(F2._unsafe()).isNull();
+        assertThat(F1.getOrDefault(0)).isEqualTo(0);
+        assertThat(F2.getOrDefault(0)).isEqualTo(0);
     }
 
     /**
@@ -200,10 +190,6 @@ class MaybeSpecs {
 
         assertThat(F_id_a).isNotSameAs(id_F_a);
         assertThat(F_id_a).isEqualTo(id_F_a);
-
-        // TODO: Include?
-        // TODO: Move to own tests
-        //assertThat(F_id_a._unsafe()).isSameAs(id_F_a._unsafe());
     }
 
     @Test
@@ -215,6 +201,67 @@ class MaybeSpecs {
         Maybe<String> id_F_a = Function.<Maybe<String>>identity().apply(nothing());
 
         assertThat(F_id_a).isSameAs(id_F_a);
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Applicative functor
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Test
+    void shouldPutValuesInThisApplicativeFunctor() {
+        Maybe<?> maybe = withMaybe().pure("JustDoIt");
+
+        assertThat(maybe.getOrNull()).isEqualTo("JustDoIt");
+    }
+
+    @Test
+    void shouldPutTypedValuesInThisApplicativeFunctor() {
+        Maybe<LocalDate> maybe = withMaybe(LocalDate.class).pure(LocalDate.of(2010, 10, 13));
+
+        assertThat(maybe.getOrNull()).isEqualTo(LocalDate.of(2010, 10, 13));
+    }
+
+    @Test
+    void shouldComposeApplicativeEndoFunctors() {
+        //Function<Integer, Function<Integer, Integer>> verboseCurriedPlus =
+        //    new Function<Integer, Function<Integer, Integer>>() {
+        //        @Override
+        //        public Function<Integer, Integer> apply(Integer int1) {
+        //            return new Function<Integer, Integer>() {
+        //                @Override
+        //                public Integer apply(Integer int2) {
+        //                    return int1 + int2;
+        //                }
+        //            };
+        //        }
+        //    };
+        Function<Integer, Function<Integer, Integer>> curriedPlus =
+            (int1) ->
+                (int2) ->
+                    int1 + int2;
+
+        Function<Integer, Integer> appliedCurriedPlus = curriedPlus.apply(2);
+
+        Maybe<Function<Integer, Integer>> maybePlus = just(appliedCurriedPlus);
+        Maybe<Integer> maybeSum = just(3).apply(maybePlus);
+
+        assertThat(maybeSum.getOrNull()).isEqualTo(5);
+    }
+
+    @Test
+    void shouldComposeApplicativeFunctors() {
+        Function<String, Function<String, Integer>> curriedStringLength =
+            (string1) ->
+                (string2) ->
+                    string1.length() + string2.length();
+
+        Function<String, Integer> appliedStringLength = curriedStringLength.apply("Two");
+
+        Maybe<Function<String, Integer>> maybeStringLength = just(appliedStringLength);
+        Maybe<Integer> maybeSum = just("Three").apply(maybeStringLength);
+
+        assertThat(maybeSum.getOrNull()).isEqualTo(8);
     }
 
 

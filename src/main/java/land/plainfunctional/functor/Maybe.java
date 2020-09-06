@@ -7,6 +7,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
+import land.plainfunctional.typeclass.Applicative;
 import land.plainfunctional.typeclass.Functor;
 
 /**
@@ -27,7 +28,7 @@ import land.plainfunctional.typeclass.Functor;
  * so {@link Maybe} is an <i>algebraic data type (ADT)</i>.
  * </p>
  * <p>
- * As <code>Nothing</code> is a constant, it is a singleton i this library.
+ * As <code>Nothing</code> is a constant, it is implemented as a singleton.
  * </p>
  * <p>
  * The Maybe functor is also known as <code>Option</code>, and <code>Optional</code>.
@@ -39,18 +40,35 @@ import land.plainfunctional.typeclass.Functor;
  * @see <a href="https://wiki.haskell.org/Constructor">Haskell constructors</a>
  * @see <a href="https://en.wikipedia.org/wiki/Algebraic_data_type">Algebraic data types</a>
  */
-public class Maybe<T> implements Functor<T> {
+public class Maybe<T> implements Applicative<T> {
 
     ///////////////////////////////////////////////////////////////////////////
     // Constants and unit values
     ///////////////////////////////////////////////////////////////////////////
 
+    /**
+     * Singleton {@link Maybe} 'Nothing' value, acting as a unit of {@link Maybe}.
+     */
     private static final Maybe<? extends Object> NOTHING = new Maybe<>(null);
 
 
     ///////////////////////////////////////////////////////////////////////////
     // Factory methods
     ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Just for having a {@link Maybe} instance to reach the member methods, e.g. <code>pure</code>.
+     */
+    public static <T> Maybe<T> withMaybe() {
+        return withMaybe(null);
+    }
+
+    /**
+     * Just for having a typed {@link Maybe} instance to reach the member methods, e.g. <code>pure</code>.
+     */
+    public static <T> Maybe<T> withMaybe(Class<T> clazz) {
+        return nothing();
+    }
 
     /**
      * Trusted factory method.
@@ -129,6 +147,27 @@ public class Maybe<T> implements Functor<T> {
     public T getOrDefault(T defaultValue) {
         return fold(
             () -> defaultValue,
+            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
+            (ignored) -> this.value
+        );
+    }
+
+    /**
+     * <p>
+     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
+     * otherwise return (the bottom value) <code>null</code>.
+     * </p>
+     * <p>
+     * This is an even simpler (and somewhat reckless) application of <code>fold</code>.
+     * </p>
+     *
+     * @return this functor's value in case this is a 'Just'
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
+     */
+    public T getOrNull() {
+        return fold(
+            () -> null,
+            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
             (ignored) -> this.value
         );
     }
@@ -166,6 +205,31 @@ public class Maybe<T> implements Functor<T> {
             return nothing();
         }
         return just(function.apply(this.value));
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Applicative functor
+    ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Trusted factory method.
+     * (As no {@link Maybe} yet exists, we are free to use either of the data constructors.)
+     *
+     * {@inheritDoc}
+     */
+    @Override
+    public Maybe<T> pure(T value) {
+        return of(value);
+    }
+
+    @Override
+    public <U> Maybe<U> apply(Functor<Function<T, U>> appliedFunctionInContext) {
+        return just(
+            ((Maybe<Function<T, U>>) appliedFunctionInContext)
+                .getOrNull()
+                .apply(this.value)
+        );
     }
 
 

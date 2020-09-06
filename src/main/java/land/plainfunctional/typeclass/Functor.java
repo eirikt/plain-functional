@@ -33,10 +33,15 @@ public interface Functor<T> {
      * &nbsp;&nbsp;&nbsp;&nbsp;map :: Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
      * </code>
      * </p>
-     * <i>This means</i>: A function <code>a -&gt; b</code> is applied to a context of type f containing elements of type <code>a</code>, returning a container structure of the same type <code>f</code>containing elements of type <code>b</code>.<br>
-     * <i>This reads</i>: The map function "is a member of" Functor type <code>f</code> "having the type constraint" of for an "f of a's",
+     *
+     * <i>This means</i>: A function <code>a -&gt; b</code> is applied to a context of type <code>f</code> containing elements of type <code>a</code>,
+     * returning a container structure of the same type <code>f</code>containing elements of type <code>b</code>.<br>
+     *
+     * <i>This reads</i>: The map function "is a member of" Functor type <code>f</code> "having the type constraint" of;
+     * For an "f of a's",
      * and a function taking an "a" returning a "b",
-     * it must return an "f of b's"&mdash;and all this is the definition of the "map" function.
+     * it must return an "f of b's"&mdash;
+     * and all this is the definition of the "map" function.
      *
      * @param function The map function
      * @param <U>      The type of the codomain
