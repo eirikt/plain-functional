@@ -1,6 +1,7 @@
 package land.plainfunctional.functor;
 
 import java.time.LocalDate;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
@@ -169,6 +170,7 @@ class MaybeSpecs {
         assertThat(F2.getOrDefault(0)).isEqualTo(0);
     }
 
+
     /**
      * Functors must preserve identity morphisms:
      * map id ≡ id
@@ -236,15 +238,24 @@ class MaybeSpecs {
         //            };
         //        }
         //    };
+
+        //Function<Integer, Function<Integer, Integer>> curriedPlus =
+        //    (int1) ->
+        //        (int2) ->
+        //            int1 + int2;
+
+        //BiFunction<Integer, Integer, Integer> plus = Integer::sum;
+
+        BinaryOperator<Integer> plus = Integer::sum;
+
         Function<Integer, Function<Integer, Integer>> curriedPlus =
             (int1) ->
-                (int2) ->
-                    int1 + int2;
+                (int2) -> plus.apply(int1, int2);
 
-        Function<Integer, Integer> appliedCurriedPlus = curriedPlus.apply(2);
+        Function<Integer, Integer> appliedCurriedPlusTwo = curriedPlus.apply(2);
 
-        Maybe<Function<Integer, Integer>> maybePlus = just(appliedCurriedPlus);
-        Maybe<Integer> maybeSum = just(3).apply(maybePlus);
+        Maybe<Function<? super Integer, ? extends Integer>> maybeAppliedCurriedPlusTwo = just(appliedCurriedPlusTwo);
+        Maybe<Integer> maybeSum = just(3).apply(maybeAppliedCurriedPlusTwo);
 
         assertThat(maybeSum.tryGet()).isEqualTo(5);
     }
@@ -258,10 +269,180 @@ class MaybeSpecs {
 
         Function<String, Integer> appliedStringLength = curriedStringLength.apply("Two");
 
-        Maybe<Function<String, Integer>> maybeStringLength = just(appliedStringLength);
+        Maybe<Function<? super String, ? extends Integer>> maybeStringLength = just(appliedStringLength);
         Maybe<Integer> maybeSum = just("Three").apply(maybeStringLength);
 
         assertThat(maybeSum.tryGet()).isEqualTo(8);
+    }
+
+    @Test
+    void shouldDoAlgebraicOperationsOnApplicativeEndoFunctors_nothing() {
+        Maybe<Integer> maybeSum = just(1)
+            .apply(nothing());
+
+        assertThat(maybeSum.isNothing()).isTrue();
+
+        BinaryOperator<Integer> plus = Integer::sum;
+
+        Function<Integer, Function<Integer, Integer>> curriedPlus =
+            (int1) ->
+                (int2) -> plus.apply(int1, int2);
+
+        maybeSum = just(1)
+            .apply(just(curriedPlus.apply(22)))
+            .apply(just(curriedPlus.apply(333)))
+            .apply(nothing());
+
+        assertThat(maybeSum.isNothing()).isTrue();
+    }
+
+    @Test
+    void shouldDoAlgebraicOperationsOnApplicativeEndoFunctors_just() {
+        BinaryOperator<Integer> plus = Integer::sum;
+
+        Function<Integer, Function<Integer, Integer>> curriedPlus =
+            (int1) ->
+                (int2) -> plus.apply(int1, int2);
+
+        Maybe<Integer> maybeSum = just(1)
+            .apply(just(curriedPlus.apply(2)))
+            .apply(just(curriedPlus.apply(3)))
+            .apply(just(curriedPlus.apply(4)));
+
+        assertThat(maybeSum.tryGet()).isEqualTo(1 + 2 + 3 + 4);
+
+        // Or as applicative functor all the way
+        maybeSum = withMaybe(Integer.class)
+            .pure(1)
+            .apply(just(curriedPlus.apply(2)))
+            .apply(just(curriedPlus.apply(3)))
+            .apply(just(curriedPlus.apply(4)));
+
+        assertThat(maybeSum.tryGet()).isEqualTo(1 + 2 + 3 + 4);
+    }
+
+    // TODO: ...
+    @Test
+    void shouldDoAlgebraicOperationsOnApplicativeFunctors_nothing() {
+        //Function<String, Integer> stringLength = String::length;
+
+        //Function<? super String, Function<? super String, ? extends Integer>> curriedStringLength =
+        //    (string1) ->
+        //        (string2) -> stringLength.apply(string1) + stringLength.apply(string2);
+
+
+        Maybe<Integer> maybeStringLength = nothing()
+            .apply(nothing());
+
+        assertThat(maybeStringLength.isNothing()).isTrue();
+
+
+        maybeStringLength = just("One")
+            .apply(nothing());
+
+        assertThat(maybeStringLength.isNothing()).isTrue();
+
+
+        //maybeStringLength = nothing()
+        //    .apply(just(curriedStringLength.apply("One")));
+
+        //assertThat(maybeStringLength.isNothing()).isTrue();
+
+        /*
+        Function<? super String, ? extends Integer> x = curriedStringLength.apply("Three");
+        Maybe<Function<? super String, ? extends Integer>> xx = just(x);
+
+        maybeStringLength = just("One")
+            .apply(just(curriedStringLength.apply("Two")))
+            .apply((Maybe<Function<? super String, ? extends Integer>>)xx)
+            .apply(nothing())
+        //.apply(just(curriedStringLength.apply("Four")))
+        ;
+
+        assertThat(maybeStringLength.isNothing()).isTrue();
+        */
+    }
+
+    // TODO: ...
+    @Test
+    void shouldDoAlgebraicOperationsOnApplicativeFunctors_just() {
+        Function<String, Integer> stringLength = String::length;
+
+        Function<? super String, Function<? super String, ? extends Integer>> curriedStringLength =
+            (string1) ->
+                (string2) -> stringLength.apply(string1) + stringLength.apply(string2);
+
+
+        Maybe<String> justOneString = just("One");
+        Maybe<String> justTwoString = just("Two");
+        Maybe<String> justThreeString = just("Three");
+        Maybe<String> justFourString = just("Four");
+
+        Maybe<Integer> maybeOneStringLength = justOneString.map(stringLength);
+        Maybe<Integer> maybeTwoStringLength = justTwoString.map(stringLength);
+        Maybe<Integer> maybeThreeStringLength = justThreeString.map(stringLength);
+        Maybe<Integer> maybeFourStringLength = justFourString.map(stringLength);
+
+
+        Maybe<Integer> maybeStringLength = justOneString
+            .apply(just(curriedStringLength.apply("Two")))
+            //.apply(just(curriedStringLength.apply("Four"))) // Compiler won't handle this
+            ;
+
+        assertThat(maybeStringLength.isNothing()).isFalse();
+        assertThat(maybeStringLength.tryGet()).isEqualTo(6);
+
+
+        BinaryOperator<Integer> plus = Integer::sum;
+
+        Function<Integer, Function<Integer, Integer>> curriedPlus =
+            (int1) ->
+                (int2) -> plus.apply(int1, int2);
+
+        Function<Integer, Integer> plusOne = (integer) -> integer + 1;
+        Function<Integer, Integer> plusTwo = (integer) -> integer + 2;
+        Function<Integer, Integer> plusThree = (integer) -> integer + 3;
+        Function<Integer, Integer> plusFour = (integer) -> integer + 4;
+
+        Maybe<Function<Integer, Integer>> maybePlusOne = just(plusOne);
+        Maybe<Function<Integer, Integer>> maybePlusTwo = just(plusTwo);
+        Maybe<Function<Integer, Integer>> maybePlusThree = just(plusThree);
+        Maybe<Function<Integer, Integer>> maybePlusFour = just(plusFour);
+
+
+        Maybe<Integer> maybeSum = maybeOneStringLength
+            // TODO: Compiles, but yields 'java.lang.ClassCastException: land.plainfunctional.monad.MaybeSpecs$1 cannot be cast to land.plainfunctional.monad.Maybe'
+            //.apply(
+            //    new Functor<Function<? super Integer, ? extends Integer>>() {
+            //        @Override
+            //        public <U> Functor<U> map(Function<? super Function<? super Integer, ? extends Integer>, ? extends U> function) {
+            //            return of(
+            //                function.apply(
+            //                    (Function<Integer, Integer>) integer -> integer + 2
+            //                )
+            //            );
+            //        }
+            //    })
+            .apply(
+                of(
+                    (Function<Integer, Integer>) (int1) -> int1 + maybeTwoStringLength.getOrDefault(0)
+                )
+            )
+            .apply(
+                of(
+                    new Function<Integer, Integer>() {
+                        @Override
+                        public Integer apply(Integer int1) {
+                            return curriedPlus.apply(int1).apply(maybeThreeStringLength.getOrDefault(0));
+                        }
+                    }
+                )
+            )
+            .apply(of(plusFour))
+            //.apply(maybePlusFour) // Compiler won't handle this
+            ;
+
+        assertThat(maybeSum.tryGet()).isEqualTo(3 + 3 + 5 + 4);
     }
 
 

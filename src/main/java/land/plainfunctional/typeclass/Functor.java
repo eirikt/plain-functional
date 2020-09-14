@@ -18,7 +18,7 @@ import java.util.function.Function;
  * If ignoring the mathematical roots of this concept, this Java interface would maybe have been called <code>Mappable</code>.
  * </p>
  *
- * @param <T> The type of the value in the context, or, the type of the functor value, or just, the functor type
+ * @param <T> The type of the value context, or just, the functor type
  * @see <a href="https://en.wikipedia.org/wiki/Functor_(functional_programming)">Functor (Wikipedia)</a>
  * @see <a href="https://bartoszmilewski.com/2015/01/20/functors/">Functors (Category Theory for Programmers)</a>
  */

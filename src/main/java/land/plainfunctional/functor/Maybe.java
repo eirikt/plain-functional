@@ -8,7 +8,6 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 import land.plainfunctional.typeclass.Applicative;
-import land.plainfunctional.typeclass.Functor;
 
 /**
  * <p>
@@ -47,7 +46,7 @@ public class Maybe<T> implements Applicative<T> {
     ///////////////////////////////////////////////////////////////////////////
 
     /**
-     * Singleton {@link Maybe} 'Nothing' value, acting as a unit of {@link Maybe}.
+     * Singleton {@link Maybe} 'Nothing' value, acting as unit of {@link Maybe} Nothing.
      */
     private static final Maybe<? extends Object> NOTHING = new Maybe<>(null);
 
@@ -66,13 +65,13 @@ public class Maybe<T> implements Applicative<T> {
     /**
      * Just for having a typed {@link Maybe} instance to reach the member methods, e.g. <code>pure</code>.
      */
-    public static <T> Maybe<T> withMaybe(Class<T> clazz) {
+    public static <T> Maybe<T> withMaybe(Class<T> type) {
         return nothing();
     }
 
     /**
      * Trusted factory method.
-     * (As no {@link Maybe} yet exists, we are free to use either of the stat constructors.)
+     * (As no {@link Maybe} yet exists, we are free to use either of the data constructors.)
      *
      * @param value The value to be put into this {@link Maybe} functor
      * @return A 'Nothing' if the given value is 'null', otherwise 'Just'
@@ -89,7 +88,7 @@ public class Maybe<T> implements Applicative<T> {
     /**
      * <code>Nothing</code> data constructor.
      */
-    @SuppressWarnings("unchecked") // 'NOTHING' is covariant
+    @SuppressWarnings("unchecked") // 'NOTHING' is covariant to all objects
     public static <T> Maybe<T> nothing() {
         return (Maybe<T>) NOTHING;
     }
@@ -106,15 +105,10 @@ public class Maybe<T> implements Applicative<T> {
 
 
     ///////////////////////////////////////////////////////////////////////////
-    // State
+    // State & constructor
     ///////////////////////////////////////////////////////////////////////////
 
     private final T value;
-
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Constructor
-    ///////////////////////////////////////////////////////////////////////////
 
     private Maybe(T value) {
         this.value = value;
@@ -158,7 +152,7 @@ public class Maybe<T> implements Applicative<T> {
      * otherwise return (the bottom value) <code>null</code>.
      * </p>
      * <p>
-     * This is an even simpler (and somewhat reckless) application of <code>fold</code>.
+     * This is an even simpler (and somewhat reckless and unforgiving) application of <code>fold</code>.
      * </p>
      *
      * @return this functor's value in case this is a 'Just'
@@ -178,7 +172,7 @@ public class Maybe<T> implements Applicative<T> {
      * otherwise throw a {@link NullPointerException} (a bottom value).
      * </p>
      * <p>
-     * This is also a very simple (and somewhat reckless) application of <code>fold</code>.
+     * This is also a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
      * </p>
      *
      * @return this functor's value in case this is a 'Just'
@@ -199,8 +193,9 @@ public class Maybe<T> implements Applicative<T> {
      * </p>
      * <p>
      * In abstract algebra, this is known as a "catamorphism".
-     * A catamorphism deconstructs (destroys) a data structure,
-     * in contrast to the homomorphic preservation of data structures.
+     * A catamorphism deconstructs (destroys) a data structure
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the original data structure.
      * </p>
      *
      * @param onNothing Supplier ("nullary" function/deferred constant) of the default value in case of 'Nothing'
@@ -233,10 +228,9 @@ public class Maybe<T> implements Applicative<T> {
     ///////////////////////////////////////////////////////////////////////////
 
     /**
-     * Trusted factory method.
-     * (As no {@link Maybe} yet exists, we are free to use either of the data constructors.)
-     *
      * {@inheritDoc}
+     *
+     * As no {@link Maybe} context yet exists, we are free to use either of the data constructors.
      */
     @Override
     public Maybe<T> pure(T value) {
@@ -244,11 +238,13 @@ public class Maybe<T> implements Applicative<T> {
     }
 
     @Override
-    public <U> Maybe<U> apply(Functor<Function<T, U>> appliedFunctionInContext) {
-        return just(
-            ((Maybe<Function<T, U>>) appliedFunctionInContext)
-                .getOrNull()
-                .apply(this.value)
+    public <U> Maybe<U> apply(Applicative<Function<? super T, ? extends U>> functionInContext) {
+        Maybe<Function<? super T, ? extends U>> maybeFunctionInContext =
+            (Maybe<Function<? super T, ? extends U>>) functionInContext;
+
+        return maybeFunctionInContext.isNothing()
+            ? (Maybe<U>) functionInContext
+            : just(maybeFunctionInContext.tryGet().apply(this.value)
         );
     }
 

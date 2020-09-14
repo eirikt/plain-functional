@@ -30,7 +30,7 @@ Also, that is why we are using (the good ol') Java 8 in this library&mdash;as we
 
 The state of this little library is:
 Don't use this, use [Vavr](https://www.vavr.io) (or something in that ballpark) instead.
-But who knows, maybe this library develops into something that can be recommended in the future.
+But who knows, maybe this library develops into something that might be recommended in the future.
 
 ---
 
