@@ -34,6 +34,12 @@ But who knows, maybe this library develops into something that might be recommen
 
 ---
 
+### API documentation
+
+[Javadoc](https://plain-functional-javadoc.vercel.app/)
+
+---
+
 ### Usage
 
 Build library artifact by:
