@@ -1,17 +1,20 @@
-package land.plainfunctional.functor;
+package land.plainfunctional.monad;
 
 import java.time.LocalDate;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
+import land.plainfunctional.testdomain.TestFunctions;
 import land.plainfunctional.testdomain.vanillaecommerce.MutableCustomer;
 
-import static land.plainfunctional.functor.Maybe.just;
-import static land.plainfunctional.functor.Maybe.nothing;
-import static land.plainfunctional.functor.Maybe.of;
-import static land.plainfunctional.functor.Maybe.withMaybe;
+import static land.plainfunctional.monad.Maybe.just;
+import static land.plainfunctional.monad.Maybe.nothing;
+import static land.plainfunctional.monad.Maybe.of;
+import static land.plainfunctional.monad.Maybe.withMaybe;
+import static land.plainfunctional.testdomain.TestFunctions.isEven;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -321,16 +324,8 @@ class MaybeSpecs {
         assertThat(maybeSum.tryGet()).isEqualTo(1 + 2 + 3 + 4);
     }
 
-    // TODO: ...
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeFunctors_nothing() {
-        //Function<String, Integer> stringLength = String::length;
-
-        //Function<? super String, Function<? super String, ? extends Integer>> curriedStringLength =
-        //    (string1) ->
-        //        (string2) -> stringLength.apply(string1) + stringLength.apply(string2);
-
-
         Maybe<Integer> maybeStringLength = nothing()
             .apply(nothing());
 
@@ -341,29 +336,8 @@ class MaybeSpecs {
             .apply(nothing());
 
         assertThat(maybeStringLength.isNothing()).isTrue();
-
-
-        //maybeStringLength = nothing()
-        //    .apply(just(curriedStringLength.apply("One")));
-
-        //assertThat(maybeStringLength.isNothing()).isTrue();
-
-        /*
-        Function<? super String, ? extends Integer> x = curriedStringLength.apply("Three");
-        Maybe<Function<? super String, ? extends Integer>> xx = just(x);
-
-        maybeStringLength = just("One")
-            .apply(just(curriedStringLength.apply("Two")))
-            .apply((Maybe<Function<? super String, ? extends Integer>>)xx)
-            .apply(nothing())
-        //.apply(just(curriedStringLength.apply("Four")))
-        ;
-
-        assertThat(maybeStringLength.isNothing()).isTrue();
-        */
     }
 
-    // TODO: ...
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeFunctors_just() {
         Function<String, Integer> stringLength = String::length;
@@ -447,6 +421,177 @@ class MaybeSpecs {
 
 
     ///////////////////////////////////////////////////////////////////////////
+    // Monad laws
+    // https://wiki.haskell.org/Monad_laws
+    // See: https://devth.com/2015/monad-laws-in-scala
+    ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Left identity:
+     * If we take a value and put it in a context with 'pure' and then feed it to a monad action using >>= ('bind'),
+     * it is the same as just taking the value and applying the function to it.
+     *
+     * ...
+     *
+     * Haskell:
+     * return a >>= f ≡ f a
+     *
+     * Where:
+     * - 'return' is the same as 'pure'/'of' static factory methods, or 'just'/'nothing' data constructors for 'Maybe'
+     * - 'a' is parameterized type
+     * - '>>=' is 'bind'
+     * - 'f' is the monad action function - 'f' has the same (Haskell-style) type signature as 'return': a -> m a
+     *
+     * ...
+     *
+     * Java (pseudocode):
+     * (m a).bind(f) ≡ f a
+     *
+     * Where:
+     * - 'm' is the monad (here represented by one of its data constructors)
+     * - 'a' is a (generic) value
+     * - 'f' is the monad action function - 'f' has the same (Haskell-style) type signature as 'return': a -> m a
+     */
+    @Test
+    public void shouldHaveLeftIdentity_nothing() {
+        // f (A monad action)
+        Function<String, Maybe<Integer>> f = (ignored) -> nothing();
+
+        // a (a parametrically typed value/generic value)
+        String value = null;
+
+        // m (Maybe Nothing's data constructor)
+        Function<String, Maybe<String>> m = (s) -> nothing();
+
+        // m a (same as 'nothing()')
+        Maybe<String> m_a = m.apply(value);
+
+        assertThat(m_a.bind(f)).isSameAs(f.apply(value));
+    }
+
+    @Test
+    public void shouldHaveLeftIdentity_just() {
+        // f (A monad action)
+        Function<String, Maybe<Integer>> f = (s) -> just(s.length());
+
+        // a (a parametrically typed value/generic value)
+        String value = "Blue";
+
+        // m a (same as 'just(value)')
+        Maybe<String> m_a = just(value);
+
+        assertThat(m_a.bind(f)).isNotSameAs(f.apply(value));
+        assertThat(m_a.bind(f)).isEqualTo(f.apply(value));
+    }
+
+
+    /**
+     * Right identity:
+     * If we have a monad and we use >>= ('bind') to feed it to 'pure'',
+     * the result is our original monad.
+     *
+     * Haskell:
+     * m >>= return ≡ m
+     *
+     * Where:
+     * - 'return' is the same as 'pure'/'of' static factory methods, or 'just'/'nothing' data constructors for 'Maybe'
+     * - '>>=' is 'bind'
+     * - 'm' is the monad (function) - 'm' has the same (Haskell-style) type signature as 'return': a -> m a
+     *
+     * ...
+     *
+     * Java (pseudocode):
+     * (m a).bind(m) ≡ m a
+     *
+     * Where:
+     * - 'm' is the monad (here represented by one of its data constructors)
+     * - 'm' is the has the same (Haskell-style) type signature as 'return': a -> m a
+     * - 'a' is a (generic) value
+     * - 'm a' is a value in a monad (in a monadic context) - same as 'return a' above
+     */
+    @Test
+    public void shouldHaveRightIdentity_nothing() {
+        // a (a parametrically typed value/generic value)
+        String value = null;
+
+        // m (Maybe Nothing's data constructor)
+        Function<String, Maybe<String>> m = (ignored) -> Maybe.nothing();
+
+        // m a
+        Maybe<String> m_a = m.apply(value);
+
+        assertThat(m_a.bind(m)).isSameAs(m_a);
+    }
+
+    @Test
+    public void shouldHaveRightIdentity_just() {
+        // a (a parametrically typed value/generic value)
+        String value = "myValue";
+
+        // m (Maybe Just's data constructor)
+        Function<String, Maybe<String>> m = Maybe::just;
+
+        // m a
+        Maybe<String> m_a = m.apply(value);
+
+        assertThat(m_a.bind(m)).isNotSameAs(m_a);
+        assertThat(m_a.bind(m)).isEqualTo(m_a);
+    }
+
+
+    /**
+     * Associativity:
+     * When we have a chain of monadic function applications with >>= ('bind')
+     * it should not matter how they are nested.
+     *
+     * Haskell:
+     * (m >>= f) >>= g ≡ m >>= (λx -> f x >>= g)
+     */
+    @Test
+    public void shouldHaveAssociativity_nothing() {
+        // Monad actions
+        Function<String, Maybe<Integer>> f = s -> just(s.length());
+        Function<Integer, Maybe<Boolean>> g = i -> just(isEven(i));
+
+        // a (a parametrically typed value/generic value)
+        String value = "N/A";
+
+        // m (Maybe Nothing's data constructor)
+        Function<String, Maybe<String>> m = (ignored) -> Maybe.nothing();
+
+        // m a (same as 'M a')
+        Maybe<String> m_a = m.apply(value);
+
+        Maybe<Boolean> lhs = m_a.bind(f).bind(g);
+        Maybe<Boolean> rhs = m_a.bind((a) -> f.apply(a).bind(g));
+
+        assertThat(lhs).isSameAs(rhs);
+    }
+
+    @Test
+    public void shouldHaveAssociativity_just() {
+        // Monad actions
+        Function<String, Maybe<Integer>> f = s -> just(s.length());
+        Function<Integer, Maybe<Boolean>> g = i -> just(isEven(i));
+
+        // a (a parametrically typed value/generic value)
+        String value = "myValue";
+
+        // m (Maybe Just's data constructor)
+        Function<String, Maybe<String>> m = Maybe::just;
+
+        // m a (same as 'M a')
+        Maybe<String> m_a = m.apply(value);
+
+        Maybe<Boolean> lhs = m_a.bind(f).bind(g);
+        Maybe<Boolean> rhs = m_a.bind((a) -> f.apply(a).bind(g));
+
+        assertThat(lhs).isNotSameAs(rhs);
+        assertThat(lhs).isEqualTo(rhs);
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
     // Fold (catamorphism) semantics
     ///////////////////////////////////////////////////////////////////////////
 
@@ -486,5 +631,76 @@ class MaybeSpecs {
     @Test
     void getOrDefault_just() {
         assertThat(of("Three").getOrDefault("Nope")).isEqualTo("Three");
+    }
+
+    @Test
+    void shouldUsePredicatesAsMapFunctionAsFilter() {
+        Maybe<Integer> maybe10 = nothing();
+        Maybe<Integer> just10 = just(10);
+        Maybe<Integer> just11 = just(11);
+
+
+        Maybe<Boolean> maybeEven = maybe10.map(TestFunctions::isEven);
+
+        //assertThat(maybeEven.tryGet()).isTrue();
+        assertThat(maybeEven.getOrDefault(false)).isFalse();
+        assertThat(maybeEven.getOrNull()).isNull();
+
+
+        maybeEven = just10.map(TestFunctions::isEven);
+
+        assertThat(maybeEven.tryGet()).isTrue();
+        assertThat(maybeEven.getOrDefault(false)).isTrue();
+        assertThat(maybeEven.getOrNull()).isTrue();
+
+
+        maybeEven = just11.map(TestFunctions::isEven);
+
+        assertThat(maybeEven.tryGet()).isFalse();
+        assertThat(maybeEven.getOrDefault(true)).isFalse();
+        assertThat(maybeEven.getOrNull()).isFalse();
+    }
+
+    @Test
+    void shouldUseFoldAsFilter() {
+        //Function<Integer, ?> nullFunction = (ignored) -> null;
+        Supplier<Boolean> nullBooleanSupplier = () -> null;
+        Supplier<?> nullSupplier = () -> null;
+
+
+        Maybe<Integer> maybe10 = nothing();
+        Maybe<Integer> just10 = just(10);
+        Maybe<Integer> just11 = just(11);
+
+        assertThat(nothing(Integer.class).fold(
+            nullBooleanSupplier,
+            TestFunctions::isEven
+        )).isNull();
+
+        assertThat(maybe10.fold(
+            nullBooleanSupplier,
+            TestFunctions::isEven
+        )).isNull();
+
+
+        Boolean isEven = just10.fold(
+            //() -> { throw new IllegalStateException(); },
+            //() -> null,
+            (Supplier<Boolean>) nullSupplier,
+            //nullBooleanSupplier,
+
+            //(Supplier<Boolean>) nullSupplier,
+            TestFunctions::isEven
+        );
+
+        assertThat(isEven).isTrue();
+
+
+        isEven = just11.fold(
+            nullBooleanSupplier,
+            TestFunctions::isEven
+        );
+
+        assertThat(isEven).isFalse();
     }
 }

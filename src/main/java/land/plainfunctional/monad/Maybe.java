@@ -1,4 +1,4 @@
-package land.plainfunctional.functor;
+package land.plainfunctional.monad;
 
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -8,15 +8,18 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 import land.plainfunctional.typeclass.Applicative;
+import land.plainfunctional.typeclass.Monad;
 
 /**
  * <p>
  * <i>Functor context:</i> <b>The value/values may or may not be present</b>
  * </p>
+ *
  * <p>
  * Haskell type definition:<br><br>
  * <code>&nbsp;&nbsp;&nbsp;&nbsp;data Maybe a = Nothing | Just a</code>
  * </p>
+ *
  * <p>
  * Here {@link Maybe} is the <i>type constructor</i>,
  * while <code>Nothing</code> and <code>Just</code> are <i>data constructors</i> (also known as <i>value constructors</i>).
@@ -26,9 +29,11 @@ import land.plainfunctional.typeclass.Applicative;
  * Instances of {@link Maybe} will either be a <code>Nothing</code> or a <code>Just</code> value,
  * so {@link Maybe} is an <i>algebraic data type (ADT)</i>.
  * </p>
+ *
  * <p>
  * As <code>Nothing</code> is a constant, it is implemented as a singleton.
  * </p>
+ *
  * <p>
  * The Maybe functor is also known as <code>Option</code>, and <code>Optional</code>.
  * </p>
@@ -39,7 +44,7 @@ import land.plainfunctional.typeclass.Applicative;
  * @see <a href="https://wiki.haskell.org/Constructor">Haskell constructors</a>
  * @see <a href="https://en.wikipedia.org/wiki/Algebraic_data_type">Algebraic data types</a>
  */
-public class Maybe<T> implements Applicative<T> {
+public class Maybe<T> implements Monad<T> {
 
     ///////////////////////////////////////////////////////////////////////////
     // Constants and unit values
@@ -77,7 +82,9 @@ public class Maybe<T> implements Applicative<T> {
      * @return A 'Nothing' if the given value is 'null', otherwise 'Just'
      */
     public static <T> Maybe<T> of(T value) {
-        return value == null ? nothing() : just(value);
+        return value == null
+            ? nothing()
+            : just(value);
     }
 
 
@@ -90,6 +97,14 @@ public class Maybe<T> implements Applicative<T> {
      */
     @SuppressWarnings("unchecked") // 'NOTHING' is covariant to all objects
     public static <T> Maybe<T> nothing() {
+        return (Maybe<T>) NOTHING;
+    }
+
+    /**
+     * <code>Nothing</code> data constructor.
+     */
+    @SuppressWarnings("unchecked") // 'NOTHING' is covariant to all objects
+    public static <T> Maybe<T> nothing(Class<T> type) {
         return (Maybe<T>) NOTHING;
     }
 
@@ -129,48 +144,9 @@ public class Maybe<T> implements Applicative<T> {
     /**
      * <p>
      * Retrieve this {@link Maybe} functor's value if this is a 'Just',
-     * otherwise the given default value will be returned.
-     * </p>
-     * <p>
-     * This is a simple application of <code>fold</code>.
-     * </p>
-     *
-     * @param defaultValue The default value in case this is 'Nothing'
-     * @return this functor's value in case this is a 'Just'
-     */
-    public T getOrDefault(T defaultValue) {
-        return fold(
-            () -> defaultValue,
-            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
-            (ignored) -> this.value
-        );
-    }
-
-    /**
-     * <p>
-     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
-     * otherwise return (the bottom value) <code>null</code>.
-     * </p>
-     * <p>
-     * This is an even simpler (and somewhat reckless and unforgiving) application of <code>fold</code>.
-     * </p>
-     *
-     * @return this functor's value in case this is a 'Just'
-     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
-     */
-    public T getOrNull() {
-        return fold(
-            () -> null,
-            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
-            (ignored) -> this.value
-        );
-    }
-
-    /**
-     * <p>
-     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
      * otherwise throw a {@link NullPointerException} (a bottom value).
      * </p>
+     *
      * <p>
      * This is also a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
      * </p>
@@ -188,9 +164,48 @@ public class Maybe<T> implements Applicative<T> {
 
     /**
      * <p>
+     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
+     * otherwise return (the bottom value) <code>null</code>.
+     * </p>
+     *
+     * <p>
+     * This is an even simpler (and somewhat reckless) application of <code>fold</code>.
+     * </p>
+     *
+     * @return this functor's value in case this is a 'Just'
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
+     */
+    public T getOrNull() {
+        return getOrDefault(null);
+    }
+
+    /**
+     * <p>
+     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
+     * otherwise the given default value will be returned.
+     * </p>
+     *
+     * <p>
+     * This is a simple application of <code>fold</code>.
+     * </p>
+     *
+     * @param defaultValue The default value in case this is 'Nothing'
+     * @return this functor's value in case this is a 'Just'
+     */
+    public T getOrDefault(T defaultValue) {
+        return fold(
+            () -> defaultValue,
+            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
+            (ignored) -> this.value
+        );
+    }
+
+    /**
+     * <p>
      * To <i>fold</i> a data structure means creating a new representation of this value.
      * This will most often result in leaving the {@link Maybe} functor behind.
      * </p>
+     *
      * <p>
      * In abstract algebra, this is known as a "catamorphism".
      * A catamorphism deconstructs (destroys) a data structure
@@ -216,10 +231,9 @@ public class Maybe<T> implements Applicative<T> {
 
     @Override
     public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
-        if (this.isNothing()) {
-            return nothing();
-        }
-        return just(function.apply(this.value));
+        return isNothing()
+            ? nothing()
+            : just(function.apply(this.value));
     }
 
 
@@ -246,6 +260,21 @@ public class Maybe<T> implements Applicative<T> {
             ? (Maybe<U>) functionInContext
             : just(maybeFunctionInContext.tryGet().apply(this.value)
         );
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Monad
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Override
+    public Maybe<T> join() {
+        if (this.value instanceof Maybe<?>) {
+            // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
+            // TODO: Well, also argue that this must be the case...
+            return (Maybe<T>) this.value;
+        }
+        return this;
     }
 
 
