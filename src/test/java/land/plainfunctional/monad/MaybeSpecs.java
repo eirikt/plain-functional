@@ -1,6 +1,7 @@
 package land.plainfunctional.monad;
 
 import java.time.LocalDate;
+import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -10,11 +11,14 @@ import org.junit.jupiter.api.Test;
 import land.plainfunctional.testdomain.TestFunctions;
 import land.plainfunctional.testdomain.vanillaecommerce.MutableCustomer;
 
+import static java.lang.Integer.sum;
+import static java.lang.String.format;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.monad.Maybe.of;
 import static land.plainfunctional.monad.Maybe.withMaybe;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -25,8 +29,9 @@ class MaybeSpecs {
     ///////////////////////////////////////////////////////////////////////////
 
     @Test
-    void shouldEncapsulateValues() {
+    void shouldEncapsulateValue() {
         Maybe<Integer> maybe3 = just(3);
+
         assertThat(maybe3.isNothing()).isFalse();
 
         assertThat(maybe3).isNotSameAs(just(3));
@@ -42,21 +47,32 @@ class MaybeSpecs {
     }
 
     @Test
+    void shouldEncapsulateNullValueViaFactoryMethodOnly() {
+        Maybe<String> maybe = of(null);
+
+        assertThat(maybe.isNothing()).isTrue();
+    }
+
+    @Test
     void shouldEncapsulateNothing() {
         Maybe<String> nothing = nothing();
+
         assertThat(nothing.isNothing()).isTrue();
+
+        // Bonus: Functor behaviour
+        Maybe<String> mapped = nothing.map((string) -> string + " morphed to 'Just'");
+        assertThat(mapped.isNothing()).isTrue();
+
+        // Bonus: Monad behaviour
+        Maybe<String> next = nothing.bind((string) -> just(string + " morphed to 'Just'"));
+        assertThat(next.isNothing()).isTrue();
     }
 
     @Test
     void shouldEncapsulateNothingAndRespectReferentialTransparency() {
         Maybe<String> nothing = nothing();
-        assertThat(nothing).isSameAs(nothing());
-    }
 
-    @Test
-    void shouldEncapsulateNullValuesViaFactoryMethodOnly() {
-        Maybe<String> maybe = of(null);
-        assertThat(maybe.isNothing()).isTrue();
+        assertThat(nothing).isSameAs(nothing());
     }
 
     /**
@@ -130,10 +146,10 @@ class MaybeSpecs {
     void functorsShouldPreserveCompositionOfMorphisms_just() {
         Maybe<Integer> maybe3 = just(13);
 
-        Function<Object, String> intToString = Object::toString;
+        Function<Integer, String> intToString = Object::toString;
         Function<String, Integer> stringLength = String::length;
 
-        Function<Object, String> f = intToString;
+        Function<Integer, String> f = intToString;
         Function<String, Integer> g = stringLength;
 
         Maybe<Integer> F1 = maybe3.map(g.compose(f));
@@ -151,11 +167,11 @@ class MaybeSpecs {
     void functorsShouldPreserveCompositionOfMorphisms_nothing() {
         Maybe<Integer> maybe = nothing();
 
-        Function<Integer, Integer> plus13 = myInt -> myInt + 13;
-        Function<Integer, Integer> minus5 = myInt -> myInt - 5;
+        Function<Integer, String> intToString = Object::toString;
+        Function<String, Integer> stringLength = String::length;
 
-        Function<Integer, Integer> f = plus13;
-        Function<Integer, Integer> g = minus5;
+        Function<Integer, String> f = intToString;
+        Function<String, Integer> g = stringLength;
 
         Maybe<Integer> F1 = maybe.map(g.compose(f));
         Maybe<Integer> F2 = maybe.map(f).map(g);
@@ -301,11 +317,8 @@ class MaybeSpecs {
 
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeEndoFunctors_just() {
-        BinaryOperator<Integer> plus = Integer::sum;
-
         Function<Integer, Function<Integer, Integer>> curriedPlus =
-            (int1) ->
-                (int2) -> plus.apply(int1, int2);
+            (int1) -> (int2) -> sum(int1, int2);
 
         Maybe<Integer> maybeSum = just(1)
             .apply(just(curriedPlus.apply(2)))
@@ -322,6 +335,50 @@ class MaybeSpecs {
             .apply(just(curriedPlus.apply(4)));
 
         assertThat(maybeSum.tryGet()).isEqualTo(1 + 2 + 3 + 4);
+
+        // Or 'map' of curried binary functions
+        maybeSum = just(1)
+            .apply(just(2).map(curriedPlus))
+            .apply(just(3).map(curriedPlus))
+            .apply(just(4).map(curriedPlus));
+
+        assertThat(maybeSum.tryGet()).isEqualTo(1 + 2 + 3 + 4);
+    }
+
+    @Test
+    void whenPartialFunctionReturnsNull_shouldThrowException() {
+        BinaryOperator<Integer> plus = Integer::sum;
+
+        Function<Integer, Function<Integer, Integer>> curriedPlus =
+            (int1) ->
+                (int2) -> plus.apply(int1, int2);
+
+        Function<Integer, Function<Integer, Integer>> nullFn =
+            (int1) ->
+                (int2) -> null;
+
+        assertThatThrownBy(
+            () ->
+                withMaybe(Integer.class)
+                    .pure(1)
+                    .apply(just(curriedPlus.apply(2)))
+                    .apply(just(curriedPlus.apply(3)))
+                    // NB! Partial function returning null/bottom leads to runtime error
+                    .apply(just(nullFn.apply(100)))
+                    .apply(just(curriedPlus.apply(4)))
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+
+        // And when doing 'map' of curried binary functions
+        assertThatThrownBy(
+            () ->
+                just(1)
+                    .apply(just(2).map(curriedPlus))
+                    .apply(just(3).map(curriedPlus))
+                    .apply(just(3).map(nullFn))
+                    .apply(just(4).map(curriedPlus))
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
     }
 
     @Test
@@ -331,9 +388,25 @@ class MaybeSpecs {
 
         assertThat(maybeStringLength.isNothing()).isTrue();
 
+        // Won't compile
+        //maybeStringLength = nothing()
+        //.apply(just("One"));
+
+        assertThat(maybeStringLength.isNothing()).isTrue();
 
         maybeStringLength = just("One")
-            .apply(nothing());
+            .apply(nothing())
+        // Won't compile
+        //.apply(just("Two"))
+        ;
+
+        assertThat(maybeStringLength.isNothing()).isTrue();
+
+        maybeStringLength = just("One")
+            .apply(of(null))
+        // Won't compile
+        //.apply(just("Two"))
+        ;
 
         assertThat(maybeStringLength.isNothing()).isTrue();
     }
@@ -342,36 +415,57 @@ class MaybeSpecs {
     void shouldDoAlgebraicOperationsOnApplicativeFunctors_just() {
         Function<String, Integer> stringLength = String::length;
 
-        Function<? super String, Function<? super String, ? extends Integer>> curriedStringLength =
-            (string1) ->
-                (string2) -> stringLength.apply(string1) + stringLength.apply(string2);
-
-
-        Maybe<String> justOneString = just("One");
-        Maybe<String> justTwoString = just("Two");
-        Maybe<String> justThreeString = just("Three");
-        Maybe<String> justFourString = just("Four");
-
-        Maybe<Integer> maybeOneStringLength = justOneString.map(stringLength);
-        Maybe<Integer> maybeTwoStringLength = justTwoString.map(stringLength);
-        Maybe<Integer> maybeThreeStringLength = justThreeString.map(stringLength);
-        Maybe<Integer> maybeFourStringLength = justFourString.map(stringLength);
-
-
-        Maybe<Integer> maybeStringLength = justOneString
-            .apply(just(curriedStringLength.apply("Two")))
-            //.apply(just(curriedStringLength.apply("Four"))) // Compiler won't handle this
-            ;
-
-        assertThat(maybeStringLength.isNothing()).isFalse();
-        assertThat(maybeStringLength.tryGet()).isEqualTo(6);
-
+        //Function<? super String, Function<? super String, ? extends Integer>> curriedStringLength =
+        //    (string1) ->
+        //        (string2) -> stringLength.apply(string1) + stringLength.apply(string2);
 
         BinaryOperator<Integer> plus = Integer::sum;
+
+        BiFunction<Integer, Integer, Integer> plus2 = Integer::sum;
 
         Function<Integer, Function<Integer, Integer>> curriedPlus =
             (int1) ->
                 (int2) -> plus.apply(int1, int2);
+
+
+        //Maybe<String> justOneString = just("One");
+        //Maybe<String> justTwoString = just("Two");
+        //Maybe<String> justThreeString = just("Three");
+        //Maybe<String> justFourString = just("Four");
+
+        //Maybe<Integer> maybeOneStringLength = justOneString.map(String::length);
+        //Maybe<Integer> maybeTwoStringLength = justTwoString.map(String::length);
+        //Maybe<Integer> maybeThreeStringLength = justThreeString.map(String::length);
+        //Maybe<Integer> maybeFourStringLength = justFourString.map(String::length);
+
+
+        //Maybe<Integer> maybeStringLength = justOneString
+        //    .apply(just(curriedStringLength.apply("Two")))
+        //    .apply(just(curriedStringLength.apply("Four"))) // Compiler won't handle this
+        //    ;
+
+        //assertThat(maybeStringLength.isNothing()).isFalse();
+        //assertThat(maybeStringLength.tryGet()).isEqualTo(6);
+
+        //Maybe<Integer> maybeStringLength = just("One")
+        //    .apply(just("Two").map(curriedStringLength))
+        //    .apply(just("Three").map(curriedStringLength)) // Compiler won't handle this
+        //    ;
+
+        Maybe<Integer> maybeStringLength = just(0)
+            .apply(just("One").map(stringLength).map(curriedPlus))
+            .apply(just("Two").map(stringLength).map(curriedPlus))
+            .apply(just("Three").map(stringLength).map(curriedPlus));
+
+        //assertThat(maybeStringLength.isNothing()).isFalse();
+        assertThat(maybeStringLength.tryGet()).isEqualTo(3 + 3 + 5);
+
+
+        /*
+        BinaryOperator<Integer> plus = Integer::sum;
+
+        Function<Integer, Function<Integer, Integer>> curriedPlus =
+            (int1) -> (int2) -> plus.apply(int1, int2);
 
         Function<Integer, Integer> plusOne = (integer) -> integer + 1;
         Function<Integer, Integer> plusTwo = (integer) -> integer + 2;
@@ -386,17 +480,17 @@ class MaybeSpecs {
 
         Maybe<Integer> maybeSum = maybeOneStringLength
             // TODO: Compiles, but yields 'java.lang.ClassCastException: land.plainfunctional.monad.MaybeSpecs$1 cannot be cast to land.plainfunctional.monad.Maybe'
-            //.apply(
-            //    new Functor<Function<? super Integer, ? extends Integer>>() {
-            //        @Override
-            //        public <U> Functor<U> map(Function<? super Function<? super Integer, ? extends Integer>, ? extends U> function) {
-            //            return of(
-            //                function.apply(
-            //                    (Function<Integer, Integer>) integer -> integer + 2
-            //                )
-            //            );
-            //        }
-            //    })
+            .apply(
+                new Functor<Function<? super Integer, ? extends Integer>>() {
+                    @Override
+                    public <U> Functor<U> map(Function<? super Function<? super Integer, ? extends Integer>, ? extends U> function) {
+                        return of(
+                            function.apply(
+                                (Function<Integer, Integer>) integer -> integer + 2
+                            )
+                        );
+                    }
+                })
             .apply(
                 of(
                     (Function<Integer, Integer>) (int1) -> int1 + maybeTwoStringLength.getOrDefault(0)
@@ -412,11 +506,134 @@ class MaybeSpecs {
                     }
                 )
             )
-            .apply(of(plusFour))
+            .apply(just(plusFour))
             //.apply(maybePlusFour) // Compiler won't handle this
             ;
 
         assertThat(maybeSum.tryGet()).isEqualTo(3 + 3 + 5 + 4);
+        */
+    }
+
+    @Test
+    void shouldDoAlgebraicOperationsOnApplicativeFunctors_2_just() {
+        Function<Integer, String> getNegativeNumberInfo =
+            (integer) ->
+                integer < 0
+                    ? format("%d is a negative number", integer)
+                    : format("%d is a natural number", integer);
+
+        Function<Integer, String> getGreaterThanTenInfo =
+            (integer) ->
+                integer > 10
+                    ? format("%d is greater than 10", integer)
+                    : format("%d is less or equal to 10", integer);
+
+        Function<String, Function<String, String>> curriedStringAppender =
+            (string1) ->
+                (string2) ->
+                    isBlank(string2) ? string1 : string1 + ", " + string2;
+
+        Maybe<String> maybeInfoString = just("")
+            .apply(just(7).map(getGreaterThanTenInfo).map(curriedStringAppender))
+            .apply(just(7).map(getNegativeNumberInfo).map(curriedStringAppender));
+
+        assertThat(maybeInfoString.tryGet()).isEqualTo("7 is a natural number, 7 is less or equal to 10");
+    }
+
+    @Test
+    void shouldDoValidationAndStuffLikeThat() {
+        Function<String, Function<String, String>> curriedStringAppender =
+            (string1) -> (string2) -> isBlank(string2) ? string1 : string1 + ", " + string2;
+
+        Function<Integer, String> getNegativeNumberInfo =
+            (integer) ->
+                integer < 0
+                    ? format("%d is a negative number", integer)
+                    : "";
+
+        Function<Integer, String> getGreaterThanTenInfo =
+            (integer) ->
+                integer > 10
+                    ? format("%d is greater than 10", integer)
+                    : "";
+
+        Maybe<Integer> justMinus13 = just(-13);
+        Maybe<Integer> just7 = just(7);
+
+        Maybe<String> maybeInfoString = of(
+            just("")
+                .apply(justMinus13
+                    .map(getGreaterThanTenInfo)
+                    .map(curriedStringAppender)
+                )
+                .apply(justMinus13
+                    .map(getNegativeNumberInfo)
+                    .map(curriedStringAppender)
+                )
+                .fold(
+                    () -> null,
+                    (string) -> isBlank(string) ? null : string
+                )
+        );
+        assertThat(maybeInfoString.isNothing()).isFalse();
+        assertThat(maybeInfoString.tryGet()).isEqualTo("-13 is a negative number");
+
+        maybeInfoString = just("")
+            .apply(just7
+                .map(getGreaterThanTenInfo)
+                .map(curriedStringAppender)
+            )
+            .apply(just7
+                .map(getNegativeNumberInfo)
+                .map(curriedStringAppender)
+            );
+        assertThat(maybeInfoString.tryGet()).isEqualTo("");
+
+        maybeInfoString = of(maybeInfoString.tryGet());
+        assertThat(maybeInfoString.tryGet()).isEqualTo("");
+
+        maybeInfoString = of(
+            maybeInfoString
+                .fold(
+                    () -> null,
+                    (string) -> isBlank(string) ? null : string
+                )
+        );
+        assertThat(maybeInfoString.isNothing()).isTrue();
+
+        // TODO: Possible extension 1
+        //String numberInfo = maybeInfoString.transformOrDefault(
+        //    (string) -> isBlank(string) ? null : string,
+        //    null
+        //);
+        //assertThat(numberInfo).isNull();
+
+        //maybeInfoString = of(numberInfo);
+        //assertThat(maybeInfoString.isNothing()).isTrue();
+
+        //maybeInfoString = of(
+        //    maybeInfoString.transformOrDefault(
+        //        (string) -> isBlank(string) ? null : string,
+        //        null
+        //    )
+        //);
+        //assertThat(maybeInfoString.isNothing()).isTrue();
+
+        // TODO: Possible extension 2
+        //maybeInfoString = of(
+        //    maybeInfoString.transformOrNull(
+        //        (string) -> isBlank(string) ? null : string
+        //    )
+        //);
+        //assertThat(maybeInfoString.isNothing()).isTrue();
+
+        // TODO: Possible extension 3
+        //maybeInfoString = of(
+        //    maybeInfoString.tryTransform(
+        //        (string) -> isBlank(string) ? null : string
+        //    )
+        //);
+        //assertThat(maybeInfoString.isNothing()).isTrue();
     }
 
 

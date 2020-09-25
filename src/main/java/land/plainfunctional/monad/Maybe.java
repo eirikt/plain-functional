@@ -3,16 +3,22 @@ package land.plainfunctional.monad;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
-
 import land.plainfunctional.typeclass.Applicative;
 import land.plainfunctional.typeclass.Monad;
+import land.plainfunctional.util.Arguments;
+import land.plainfunctional.value.AbstractProtectedValue;
 
 /**
  * <p>
- * <i>Functor context:</i> <b>The value/values may or may not be present</b>
+ * <i>Functor context:</i>
+ * <b>
+ * The value may or may not be present.
+ * </b>
+ * </p>
+ *
+ * <p>
+ * The semantics of the "nothing" type value is that it will ignore any function parameters (morphisms) and just pass the current state along.
+ * The "nothing" type will always represent a terminal value, there is no escape from it.
  * </p>
  *
  * <p>
@@ -27,24 +33,30 @@ import land.plainfunctional.typeclass.Monad;
  * <code>Just</code> on the other hand, has a parametric type variable <code>a</code>,
  * making the {@link Maybe} functor a <code>polymorphic</code> type.
  * Instances of {@link Maybe} will either be a <code>Nothing</code> or a <code>Just</code> value,
- * so {@link Maybe} is an <i>algebraic data type (ADT)</i>.
+ * so {@link Maybe} is a <i>sum type</i> (also known as <i>tagged union</i>, <i>disjoint union</i>, <i>variant</i>, <i>coproduct</i>).
  * </p>
  *
  * <p>
- * As <code>Nothing</code> is a constant, it is implemented as a singleton.
+ * {@link Maybe} may be seen as a specialization of the {@link Either} monad,
+ * and is implemented accordingly in this library.
+ * ({@link Maybe} delegates to an {@link Either} instance.)
  * </p>
  *
  * <p>
- * The Maybe functor is also known as <code>Option</code>, and <code>Optional</code>.
+ * As <code>Nothing</code> is a constant, it is implemented as a singleton in this library.
+ * </p>
+ *
+ * <p>
+ * The Maybe monad is also known as <code>Option</code>, and <code>Optional</code>.
  * </p>
  *
  * @param <T> The type of the value which is present or not.
  *            It is the same as the parametric type 'a' in the Haskell definition.
  * @see <a href="https://en.wikipedia.org/wiki/Option_type">Option type (Wikipedia)</a>
  * @see <a href="https://wiki.haskell.org/Constructor">Haskell constructors</a>
- * @see <a href="https://en.wikipedia.org/wiki/Algebraic_data_type">Algebraic data types</a>
+ * @see <a href="https://en.wikipedia.org/wiki/Tagged_union">Sum types</a>
  */
-public class Maybe<T> implements Monad<T> {
+public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Monad<T> {
 
     ///////////////////////////////////////////////////////////////////////////
     // Constants and unit values
@@ -101,7 +113,7 @@ public class Maybe<T> implements Monad<T> {
     }
 
     /**
-     * <code>Nothing</code> data constructor.
+     * Typed <code>Nothing</code> data constructor.
      */
     @SuppressWarnings("unchecked") // 'NOTHING' is covariant to all objects
     public static <T> Maybe<T> nothing(Class<T> type) {
@@ -112,21 +124,20 @@ public class Maybe<T> implements Monad<T> {
      * <code>Just</code> data constructor.
      */
     public static <T> Maybe<T> just(T value) {
-        if (value == null) {
-            throw new IllegalArgumentException("Cannot create a 'Maybe.Just' from a 'null' value");
-        }
+        Arguments.requireNotNull(value, "Cannot create a 'Maybe.Just' from a 'null' value");
         return new Maybe<>(value);
     }
 
 
-    ///////////////////////////////////////////////////////////////////////////
-    // State & constructor
-    ///////////////////////////////////////////////////////////////////////////
-
-    private final T value;
+    ///////////////////////////////////////////////////////
+    // Constructors
+    ///////////////////////////////////////////////////////
 
     private Maybe(T value) {
-        this.value = value;
+        super(value == null
+            ? Either.left(null)
+            : Either.right(value)
+        );
     }
 
 
@@ -138,7 +149,7 @@ public class Maybe<T> implements Monad<T> {
      * @return 'true' if and only if the 'nothing' data constructor is used, otherwise 'true'
      */
     public boolean isNothing() {
-        return this.value == null;
+        return this.value.isLeft();
     }
 
     /**
@@ -148,7 +159,7 @@ public class Maybe<T> implements Monad<T> {
      * </p>
      *
      * <p>
-     * This is also a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
+     * This is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
      * </p>
      *
      * @return this functor's value in case this is a 'Just'
@@ -158,7 +169,7 @@ public class Maybe<T> implements Monad<T> {
         return fold(
             () -> { throw new NullPointerException(); },
             // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
-            (ignored) -> this.value
+            (ignored) -> this.value.tryGet()
         );
     }
 
@@ -169,7 +180,7 @@ public class Maybe<T> implements Monad<T> {
      * </p>
      *
      * <p>
-     * This is an even simpler (and somewhat reckless) application of <code>fold</code>.
+     * This is a very simple (and somewhat reckless) application of <code>fold</code>.
      * </p>
      *
      * @return this functor's value in case this is a 'Just'
@@ -196,32 +207,50 @@ public class Maybe<T> implements Monad<T> {
         return fold(
             () -> defaultValue,
             // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
-            (ignored) -> this.value
+            (ignored) -> this.value.tryGet()
         );
     }
 
     /**
      * <p>
-     * To <i>fold</i> a data structure means creating a new representation of this value.
-     * This will most often result in leaving the {@link Maybe} functor behind.
+     * To <i>fold</i> a value means creating a new representation of it.
      * </p>
      *
      * <p>
-     * In abstract algebra, this is known as a "catamorphism".
-     * A catamorphism deconstructs (destroys) a data structure
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
      * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
-     * and <i>isomorphisms</i> where one can <i>resurrect</i> the original data structure.
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
      * </p>
      *
-     * @param onNothing Supplier ("nullary" function/deferred constant) of the default value in case of 'Nothing'
+     * "Plain functionally" (Haskell-style), "foldleft" <code>foldl</code> is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>
+     * As {@link Maybe} is a single-value functor, there is no need for a <i>binary</i> function;
+     * It is replaced by an unary function, which transforms the single <code>Just</code> value of this {@link Maybe}.
+     * Also, the need for an initial value is redundant;
+     * It is replaced by a special "nullary" function in case this {@link Maybe} is a <code>Nothing</code>.
+     * </p>
+     *
+     * @param onNothing Supplier ("nullary" function/deferred constant) of the default value in case it is 'Nothing'
      * @param onJust    Function (unary) (the "catamorphism") to be applied to this functor's value in case it is a 'Just'
-     * @param <U>       The type of the folded/returning value
+     * @param <U>       The covariant type of the folded/returning value
      * @return the folded value
      */
     public <U> U fold(Supplier<U> onNothing, Function<? super T, ? extends U> onJust) {
-        return isNothing()
-            ? onNothing.get()
-            : onJust.apply(this.value);
+        return this.value.fold(onNothing, onJust);
     }
 
 
@@ -231,9 +260,17 @@ public class Maybe<T> implements Monad<T> {
 
     @Override
     public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
+        Arguments.requireNotNull(function, "'function' argument cannot be null");
         return isNothing()
             ? nothing()
-            : just(function.apply(this.value));
+            : just(function.apply(this.value.tryGet()));
+
+        // Also possible to implement homomorphism using catamorphism.
+        // Because here, the "catamorphism" is accidentally equal to a regular homomorphism...
+        //return fold(
+        //    Maybe::nothing,
+        //    (ignored) -> just(function.apply(this.value.tryGet()))
+        //);
     }
 
 
@@ -253,12 +290,14 @@ public class Maybe<T> implements Monad<T> {
 
     @Override
     public <U> Maybe<U> apply(Applicative<Function<? super T, ? extends U>> functionInContext) {
+        Arguments.requireNotNull(functionInContext, "'functionInContext' argument cannot be null");
+
         Maybe<Function<? super T, ? extends U>> maybeFunctionInContext =
             (Maybe<Function<? super T, ? extends U>>) functionInContext;
 
         return maybeFunctionInContext.isNothing()
             ? (Maybe<U>) functionInContext
-            : just(maybeFunctionInContext.tryGet().apply(this.value)
+            : just(maybeFunctionInContext.tryGet().apply(this.value.tryGet())
         );
     }
 
@@ -269,43 +308,17 @@ public class Maybe<T> implements Monad<T> {
 
     @Override
     public Maybe<T> join() {
-        if (this.value instanceof Maybe<?>) {
+        if (this.value instanceof Either.Right<?, ?>) {
+            if (this.value.tryGet() instanceof Maybe<?>) {
+                // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
+                // TODO: Well, also argue that this must be the case...
+                return (Maybe<T>) this.value.tryGet();
+            }
             // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
             // TODO: Well, also argue that this must be the case...
             return (Maybe<T>) this.value;
         }
-        return this;
-    }
 
-
-    ///////////////////////////////////////////////////////////////////////////
-    // java.lang.Object
-    ///////////////////////////////////////////////////////////////////////////
-
-    @Override
-    public int hashCode() {
-        return new HashCodeBuilder(17, 37)
-            .append(this.value)
-            .toHashCode();
-    }
-
-    @Override
-    public boolean equals(Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (other == null || getClass() != other.getClass()) {
-            return false;
-        }
-        Maybe<? extends Object> otherMaybe = (Maybe<? extends Object>) other;
-
-        return new EqualsBuilder()
-            .append(this.value, otherMaybe.value)
-            .isEquals();
-    }
-
-    @Override
-    public String toString() {
-        return new ReflectionToStringBuilder(this).toString();
+        return nothing();
     }
 }

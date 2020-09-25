@@ -4,7 +4,7 @@ import java.util.function.Function;
 
 /**
  * <p>
- * <i><b>Monads</b> are composable computation descriptions.</i>
+ * <i>A <b>monad</b> is a composable computation description.</i>
  * </p>
  *
  * <p>
@@ -19,12 +19,12 @@ import java.util.function.Function;
  *
  * <p>
  * A monad can be thought of as an abstract datatype of actions.
- * Monads can enforce strict sequential processing of many (possible asynchronous actions),
- * and control computational effects.
+ * Monads can enforce strict sequential processing of many (possible asynchronous) actions,
+ * and control computational (side) effects.
  * </p>
  *
  * <p>
- * If ignoring the mathematical roots of this concept, this Java interface would maybe have been called <code>Chainable</code>.
+ * If ignoring the mathematical roots of this concept, this Java interface would maybe have been named <code>Chainable</code>.
  * </p>
  *
  * @param <T> The type of the value inside the monadic context, or just, the monad type
@@ -33,7 +33,7 @@ import java.util.function.Function;
 public interface Monad<T> extends Applicative<T> {
 
     /**
-     * "Flattens" a "layered"/"wrapped" monad.
+     * "Flattens"/"collapses" a "layered"/"wrapped" monad.
      *
      * <p>
      * "Plain functionally" (Haskell-style), this function is defined as:
@@ -45,9 +45,21 @@ public interface Monad<T> extends Applicative<T> {
      * </code>
      * </p>
      *
+     * <p>
+     * If not documented otherwise, the function will flatten the data structure recursively&mdash;
+     * meaning that the monad layers may be arbitrary deep.
+     * </p>
+     *
      * @return the joined monad
      */
     Monad<T> join();
+
+    /**
+     * Alias of <code>bind</code>.
+     */
+    default <V, M extends Monad<V>> M then(Function<? super T, M> function) {
+        return bind(function);
+    }
 
     /**
      * The monad function.

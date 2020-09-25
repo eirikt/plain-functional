@@ -57,15 +57,17 @@ public interface Applicative<T> extends Functor<T> {
      * </p>
      *
      * <p>
-     * Observation: <code>apply</code> seems like an <code>append</code> function of algebraic structures (to be added in this library in the near future).
+     * Observation: <code>apply</code> feels like an <code>append</code> function of algebraic structures (to be added in this library in the near future).
      * While <code>map</code> is suitable for composing unary functions transforming the functor value,
      * <code>apply</code> seems to be suitable for composing (curried) binary functions.
      * This bridges a gap between typeclasses (e.g. Functors and Monads) and algebraic structures (e.g. Sets, Semigroups, Monoids, Groups, Rings, Lattices).
-     * For algebraic structures inhibiting the <i>totality</i> property (e.g. Semigroups and Monoids), the latter requires endofunctors (<code>map :: Endofunctor f =&gt; (a -&gt; a) -&gt; f a -&gt; f a</code>).
+     * For algebraic structures inhibiting the <i>totality</i> property (e.g. Semigroups and Monoids), the latter requires <i>endofunctors</i> (<code>map :: Endofunctor f =&gt; (a -&gt; a) -&gt; f a -&gt; f a</code>).
      * </p>
      *
      * @param functionInContext The (possibly curried and applied) function already in this functor context
      * @return the new applicative functor
+     * @see <a href="https://en.wikipedia.org/wiki/Algebraic_structure">Algebraic structures</a>
+     * @see <a href="https://en.wikipedia.org/wiki/Magma_(algebra)">Magma (algebraic structure)</a>
      */
     <U> Applicative<U> apply(Applicative<Function<? super T, ? extends U>> functionInContext);
 }
