@@ -8,7 +8,7 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 import static java.lang.String.format;
 
-public class Payment implements Value {
+public class Payment {
 
     /**
      * Extended 'transient' semantics: Not to be processed in any kind of (side) effect!
@@ -60,56 +60,56 @@ public class Payment implements Value {
 
     public Payment cardNumber(String cardNumber) {
         return new Payment(
-                cardNumber,
-                this.cardHolderName,
-                this.expirationDate,
-                this.cvc,
-                this.amount,
-                this.isPaymentReceived
+            cardNumber,
+            this.cardHolderName,
+            this.expirationDate,
+            this.cvc,
+            this.amount,
+            this.isPaymentReceived
         );
     }
 
     public Payment cardHolderName(String cardHolderName) {
         return new Payment(
-                this.cardNumber,
-                cardHolderName,
-                this.expirationDate,
-                this.cvc,
-                this.amount,
-                this.isPaymentReceived
+            this.cardNumber,
+            cardHolderName,
+            this.expirationDate,
+            this.cvc,
+            this.amount,
+            this.isPaymentReceived
         );
     }
 
     public Payment expirationDate(LocalDate expirationDate) {
         return new Payment(
-                this.cardNumber,
-                this.cardHolderName,
-                expirationDate,
-                this.cvc,
-                this.amount,
-                this.isPaymentReceived
+            this.cardNumber,
+            this.cardHolderName,
+            expirationDate,
+            this.cvc,
+            this.amount,
+            this.isPaymentReceived
         );
     }
 
     public Payment cvc(Integer cvc) {
         return new Payment(
-                this.cardNumber,
-                this.cardHolderName,
-                this.expirationDate,
-                cvc,
-                this.amount,
-                this.isPaymentReceived
+            this.cardNumber,
+            this.cardHolderName,
+            this.expirationDate,
+            cvc,
+            this.amount,
+            this.isPaymentReceived
         );
     }
 
     public Payment amount(Double amount) {
         return new Payment(
-                this.cardNumber,
-                this.cardHolderName,
-                this.expirationDate,
-                this.cvc,
-                amount,
-                this.isPaymentReceived
+            this.cardNumber,
+            this.cardHolderName,
+            this.expirationDate,
+            this.cvc,
+            amount,
+            this.isPaymentReceived
         );
     }
 
@@ -117,13 +117,13 @@ public class Payment implements Value {
     @Override
     public int hashCode() {
         return new HashCodeBuilder(17, 37)
-                .append(this.cardNumber)
-                .append(this.cardHolderName)
-                .append(this.expirationDate)
-                .append(this.cvc)
-                .append(this.amount)
-                .append(this.isPaymentReceived)
-                .toHashCode();
+            .append(this.cardNumber)
+            .append(this.cardHolderName)
+            .append(this.expirationDate)
+            .append(this.cvc)
+            .append(this.amount)
+            .append(this.isPaymentReceived)
+            .toHashCode();
     }
 
     @Override
@@ -137,13 +137,13 @@ public class Payment implements Value {
         Payment otherPayment = (Payment) otherObject;
 
         return new EqualsBuilder()
-                .append(this.cardNumber, otherPayment.cardNumber)
-                .append(this.cardHolderName, otherPayment.cardHolderName)
-                .append(this.expirationDate, otherPayment.expirationDate)
-                .append(this.cvc, otherPayment.cvc)
-                .append(this.amount, otherPayment.amount)
-                .append(this.isPaymentReceived, otherPayment.isPaymentReceived)
-                .isEquals();
+            .append(this.cardNumber, otherPayment.cardNumber)
+            .append(this.cardHolderName, otherPayment.cardHolderName)
+            .append(this.expirationDate, otherPayment.expirationDate)
+            .append(this.cvc, otherPayment.cvc)
+            .append(this.amount, otherPayment.amount)
+            .append(this.isPaymentReceived, otherPayment.isPaymentReceived)
+            .isEquals();
     }
 
     @Override
@@ -157,9 +157,9 @@ public class Payment implements Value {
      */
     public String toValueString() {
         return format(
-                "%s[amount=%s, isPaymentReceived=%s]",
-                this.getClass().getName(),
-                this.amount, this.isPaymentReceived
+            "%s[amount=%s, isPaymentReceived=%s]",
+            this.getClass().getName(),
+            this.amount, this.isPaymentReceived
         );
     }
 }
