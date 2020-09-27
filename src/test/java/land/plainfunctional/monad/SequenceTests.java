@@ -1,110 +1,65 @@
 package land.plainfunctional.monad;
 
 import java.time.LocalDate;
-import java.util.function.BiFunction;
-import java.util.function.BinaryOperator;
+import java.util.Iterator;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
 import land.plainfunctional.testdomain.TestFunctions;
-import land.plainfunctional.testdomain.vanillaecommerce.MutableCustomer;
 
-import static java.lang.Integer.sum;
-import static java.lang.String.format;
-import static land.plainfunctional.monad.Maybe.just;
-import static land.plainfunctional.monad.Maybe.nothing;
-import static land.plainfunctional.monad.Maybe.of;
-import static land.plainfunctional.monad.Maybe.withMaybe;
+import static land.plainfunctional.monad.Sequence.withSequence;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class MaybeSpecs {
+class SequenceTests {
 
     ///////////////////////////////////////////////////////////////////////////
-    // Maybe semantics
+    // Sequence properties
     ///////////////////////////////////////////////////////////////////////////
 
     @Test
-    void shouldEncapsulateValue() {
-        Maybe<Integer> maybe3 = just(3);
+    void shouldProhobitNullValues() {
+        assertThatThrownBy(() -> Sequence.of((String) null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("'Sequence' cannot contain 'null' values");
 
-        assertThat(maybe3.isNothing()).isFalse();
-
-        assertThat(maybe3).isNotSameAs(just(3));
-        assertThat(maybe3).isEqualTo(just(3));
+        assertThatThrownBy(() -> Sequence.of("Value1", null, "Value2"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("'Sequence' cannot contain 'null' values");
     }
 
     @Test
-    void whenJustIsNullValue_shouldThrowException() {
-        assertThatThrownBy(
-            () -> just(null)
-        ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+    void shouldBeEmpty() {
+        Sequence<Integer> emptySequence = Sequence.of();
+
+        assertThat(emptySequence).isNotNull();
+        assertThat(emptySequence.isEmpty()).isTrue();
+        assertThat(emptySequence.size()).isEqualTo(0);
+
+
+        Sequence<Integer> emptySequence2 = Sequence.empty();
+
+        assertThat(emptySequence2).isNotNull();
+        assertThat(emptySequence2.isEmpty()).isTrue();
+        assertThat(emptySequence2.size()).isEqualTo(0);
     }
 
     @Test
-    void shouldEncapsulateNullValueViaFactoryMethodOnly() {
-        Maybe<String> maybe = of(null);
+    void shouldContainValue() {
+        Sequence<String> sequence = Sequence.of("Single value");
 
-        assertThat(maybe.isNothing()).isTrue();
+        assertThat(sequence.isEmpty()).isFalse();
+        assertThat(sequence.size()).isEqualTo(1);
     }
 
     @Test
-    void shouldEncapsulateNothing() {
-        Maybe<String> nothing = nothing();
+    void shouldContainValues() {
+        Sequence<Integer> sequence = Sequence.of(1, 2, 3, 4, 5, 6);
 
-        assertThat(nothing.isNothing()).isTrue();
-
-        // Bonus: Functor behaviour
-        Maybe<String> mapped = nothing.map((string) -> string + " morphed to 'Just'");
-        assertThat(mapped.isNothing()).isTrue();
-
-        // Bonus: Monad behaviour
-        Maybe<String> next = nothing.bind((string) -> just(string + " morphed to 'Just'"));
-        assertThat(next.isNothing()).isTrue();
-    }
-
-    @Test
-    void shouldEncapsulateNothingAndRespectReferentialTransparency() {
-        Maybe<String> nothing = nothing();
-
-        assertThat(nothing).isSameAs(nothing());
-    }
-
-    /**
-     * @see <a href="http://blog.vavr.io/the-agonizing-death-of-an-astronaut/">Vavr blog</a>
-     */
-    @Test
-    void shouldPreserveComputationalContext() {
-        assertThatThrownBy(
-            () -> of("someString").map((ignored) -> (Integer) null)
-
-        ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
-    }
-
-    /**
-     * NB! Avoiding mutating shared state is the application logic's responsibility! Sorry!
-     *
-     * This may be accomplished e.g. via immutable domain classes.
-     * See the {@link land.plainfunctional.testdomain.vanillaecommerce} test package on examples how to do that.
-     */
-    @Test
-    void willMutateArgumentsIfAllowedToDoThat() {
-        MutableCustomer customer = new MutableCustomer();
-        customer.customerId = "Jon";
-
-        of(customer)
-            .map((c) -> {
-                c.customerId = "Lisa";
-                return c;
-            });
-
-        assertThat(customer.customerId).isEqualTo("Lisa");
+        assertThat(sequence.isEmpty()).isFalse();
+        assertThat(sequence.size()).isEqualTo(6);
     }
 
 
@@ -126,22 +81,20 @@ class MaybeSpecs {
      * the result will be an unmodified functor.
      */
     @Test
-    void functorsShouldPreserveIdentityMorphism_nothing() {
-        Maybe<String> f_id_a = nothing();
+    void functorsShouldPreserveIdentityMorphism() {
+        Sequence<String> f_id_a = Sequence.of(Function.<String>identity().apply("yes"));
 
-        Maybe<String> id_f_a = Function.<Maybe<String>>identity().apply(nothing());
-
-        assertThat(f_id_a).isSameAs(id_f_a);
-    }
-
-    @Test
-    void functorsShouldPreserveIdentityMorphism_just() {
-        Maybe<String> f_id_a = just(Function.<String>identity().apply("yes"));
-
-        Maybe<String> id_f_a = Function.<Maybe<String>>identity().apply(just("yes"));
+        Sequence<String> id_f_a = Function.<Sequence<String>>identity().apply(Sequence.of("yes"));
 
         assertThat(f_id_a).isNotSameAs(id_f_a);
         assertThat(f_id_a).isEqualTo(id_f_a);
+
+        // Bonus
+        assertThat(f_id_a.isEmpty()).isFalse();
+        assertThat(f_id_a.size()).isEqualTo(1L);
+
+        assertThat(id_f_a.isEmpty()).isFalse();
+        assertThat(id_f_a.size()).isEqualTo(1L);
     }
 
 
@@ -153,8 +106,8 @@ class MaybeSpecs {
      * the result should be the same as a single mapping operation with one function that is equivalent to applying the first function to the result of the second.
      */
     @Test
-    void functorsShouldPreserveCompositionOfEndomorphisms_just() {
-        Maybe<Integer> maybe3 = just(3);
+    void functorsShouldPreserveCompositionOfMorphisms() {
+        Sequence<Integer> sequence3 = Sequence.of(3, 4);
 
         Function<Integer, Integer> plus13 = myInt -> myInt + 13;
         Function<Integer, Integer> minus5 = myInt -> myInt - 5;
@@ -162,62 +115,26 @@ class MaybeSpecs {
         Function<Integer, Integer> f = plus13;
         Function<Integer, Integer> g = minus5;
 
-        Maybe<Integer> F1 = maybe3.map(g.compose(f));
-        Maybe<Integer> F2 = maybe3.map(f).map(g);
+        Sequence<Integer> F1 = sequence3.map(g.compose(f));
+        Sequence<Integer> F2 = sequence3.map(f).map(g);
 
         assertThat(F1).isNotSameAs(F2);
         assertThat(F1).isEqualTo(F2);
 
         // Bonus
-        assertThat(F1.getOrDefault(0)).isEqualTo(3 + 13 - 5);
-        assertThat(F2.getOrDefault(0)).isEqualTo(3 + 13 - 5);
-    }
-
-    @Test
-    void functorsShouldPreserveCompositionOfMorphisms_nothing() {
-        Maybe<Integer> maybe = nothing();
-
-        Function<Integer, String> intToString = Object::toString;
-        Function<String, Integer> stringLength = String::length;
-
-        Function<Integer, String> f = intToString;
-        Function<String, Integer> g = stringLength;
-
-        Maybe<Integer> F1 = maybe.map(g.compose(f));
-        Maybe<Integer> F2 = maybe.map(f).map(g);
-
-        assertThat(F1).isSameAs(F2);
-
-        assertThat(F1.isNothing()).isTrue();
-        assertThat(F2.isNothing()).isTrue();
+        Sequence<Integer> F3 = sequence3.map(f.andThen(g));
+        assertThat(F1).isNotSameAs(F3);
+        assertThat(F1).isEqualTo(F3);
 
         // Bonus
-        assertThat(F1.getOrDefault(null)).isNull();
-        assertThat(F2.getOrDefault(null)).isNull();
+        assertThat(F1.isEmpty()).isFalse();
+        assertThat(F1.size()).isEqualTo(2L);
 
-        assertThat(F1.getOrDefault(0)).isEqualTo(0);
-        assertThat(F2.getOrDefault(0)).isEqualTo(0);
-    }
+        assertThat(F2.isEmpty()).isFalse();
+        assertThat(F2.size()).isEqualTo(2L);
 
-    @Test
-    void functorsShouldPreserveCompositionOfMorphisms_just() {
-        Maybe<Integer> maybe3 = just(13);
-
-        Function<Integer, String> intToString = Object::toString;
-        Function<String, Integer> stringLength = String::length;
-
-        Function<Integer, String> f = intToString;
-        Function<String, Integer> g = stringLength;
-
-        Maybe<Integer> F1 = maybe3.map(g.compose(f));
-        Maybe<Integer> F2 = maybe3.map(f).map(g);
-
-        assertThat(F1).isNotSameAs(F2);
-        assertThat(F1).isEqualTo(F2);
-
-        // Bonus
-        assertThat(F1.getOrDefault(0)).isEqualTo(2);
-        assertThat(F2.getOrDefault(0)).isEqualTo(2);
+        assertThat(F1._unsafe().get(0)).isEqualTo(11);
+        assertThat(F2._unsafe().get(0)).isEqualTo(11);
     }
 
 
@@ -227,18 +144,24 @@ class MaybeSpecs {
 
     @Test
     void shouldPutValuesInThisApplicativeFunctor() {
-        Maybe<?> maybe = withMaybe().pure("JustDoIt");
+        Sequence<?> sequence = withSequence().pure("JustDoIt");
 
-        assertThat(maybe.tryGet()).isEqualTo("JustDoIt");
+        assertThat(sequence.isEmpty()).isFalse();
+        assertThat(sequence.size()).isEqualTo(1L);
+        assertThat(sequence._unsafe().get(0)).isEqualTo("JustDoIt");
     }
 
     @Test
     void shouldPutTypedValuesInThisApplicativeFunctor() {
-        Maybe<LocalDate> maybe = withMaybe(LocalDate.class).pure(LocalDate.of(2010, 10, 13));
+        Sequence<LocalDate> sequence = withSequence(LocalDate.class).pure(LocalDate.of(2010, 10, 13));
 
-        assertThat(maybe.tryGet()).isEqualTo(LocalDate.of(2010, 10, 13));
+        assertThat(sequence.isEmpty()).isFalse();
+        assertThat(sequence.size()).isEqualTo(1L);
+        assertThat(sequence._unsafe().get(0)).isEqualTo(LocalDate.of(2010, 10, 13));
     }
 
+    // TODO: ...
+    /*
     @Test
     void shouldComposeApplicativeEndoFunctors() {
         //Function<Integer, Function<Integer, Integer>> verboseCurriedPlus =
@@ -274,7 +197,10 @@ class MaybeSpecs {
 
         assertThat(maybeSum.tryGet()).isEqualTo(5);
     }
+    */
 
+    // TODO: ...
+    /*
     @Test
     void shouldComposeApplicativeFunctors() {
         Function<String, Function<String, Integer>> curriedStringLength =
@@ -289,7 +215,10 @@ class MaybeSpecs {
 
         assertThat(maybeSum.tryGet()).isEqualTo(8);
     }
+    */
 
+    // TODO: ...
+    /*
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeEndoFunctors_nothing() {
         Maybe<Integer> maybeSum = just(1)
@@ -310,7 +239,10 @@ class MaybeSpecs {
 
         assertThat(maybeSum.isNothing()).isTrue();
     }
+    */
 
+    // TODO: ...
+    /*
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeEndoFunctors_just() {
         Function<Integer, Function<Integer, Integer>> curriedPlus =
@@ -340,7 +272,10 @@ class MaybeSpecs {
 
         assertThat(maybeSum.tryGet()).isEqualTo(1 + 2 + 3 + 4);
     }
+    */
 
+    // TODO: ...
+    /*
     @Test
     void whenPartialFunctionReturnsNull_shouldThrowException() {
         BinaryOperator<Integer> plus = Integer::sum;
@@ -376,7 +311,10 @@ class MaybeSpecs {
         ).isInstanceOf(IllegalArgumentException.class)
          .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
     }
+    */
 
+    // TODO: ...
+    /*
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeFunctors_nothing() {
         Maybe<Integer> maybeStringLength = nothing()
@@ -406,27 +344,116 @@ class MaybeSpecs {
 
         assertThat(maybeStringLength.isNothing()).isTrue();
     }
+    */
 
+    // TODO: ...
+    /*
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeFunctors_just() {
         Function<String, Integer> stringLength = String::length;
 
+        //Function<? super String, Function<? super String, ? extends Integer>> curriedStringLength =
+        //    (string1) ->
+        //        (string2) -> stringLength.apply(string1) + stringLength.apply(string2);
+
         BinaryOperator<Integer> plus = Integer::sum;
 
-        BiFunction<Integer, Integer, Integer> biFunctionPlus = Integer::sum;
+        BiFunction<Integer, Integer, Integer> plus2 = Integer::sum;
 
         Function<Integer, Function<Integer, Integer>> curriedPlus =
             (int1) ->
                 (int2) -> plus.apply(int1, int2);
+
+
+        //Maybe<String> justOneString = just("One");
+        //Maybe<String> justTwoString = just("Two");
+        //Maybe<String> justThreeString = just("Three");
+        //Maybe<String> justFourString = just("Four");
+
+        //Maybe<Integer> maybeOneStringLength = justOneString.map(String::length);
+        //Maybe<Integer> maybeTwoStringLength = justTwoString.map(String::length);
+        //Maybe<Integer> maybeThreeStringLength = justThreeString.map(String::length);
+        //Maybe<Integer> maybeFourStringLength = justFourString.map(String::length);
+
+
+        //Maybe<Integer> maybeStringLength = justOneString
+        //    .apply(just(curriedStringLength.apply("Two")))
+        //    .apply(just(curriedStringLength.apply("Four"))) // Compiler won't handle this
+        //    ;
+
+        //assertThat(maybeStringLength.isNothing()).isFalse();
+        //assertThat(maybeStringLength.tryGet()).isEqualTo(6);
+
+        //Maybe<Integer> maybeStringLength = just("One")
+        //    .apply(just("Two").map(curriedStringLength))
+        //    .apply(just("Three").map(curriedStringLength)) // Compiler won't handle this
+        //    ;
 
         Maybe<Integer> maybeStringLength = just(0)
             .apply(just("One").map(stringLength).map(curriedPlus))
             .apply(just("Two").map(stringLength).map(curriedPlus))
             .apply(just("Three").map(stringLength).map(curriedPlus));
 
+        //assertThat(maybeStringLength.isNothing()).isFalse();
         assertThat(maybeStringLength.tryGet()).isEqualTo(3 + 3 + 5);
-    }
 
+
+        /
+        BinaryOperator<Integer> plus = Integer::sum;
+
+        Function<Integer, Function<Integer, Integer>> curriedPlus =
+            (int1) -> (int2) -> plus.apply(int1, int2);
+
+        Function<Integer, Integer> plusOne = (integer) -> integer + 1;
+        Function<Integer, Integer> plusTwo = (integer) -> integer + 2;
+        Function<Integer, Integer> plusThree = (integer) -> integer + 3;
+        Function<Integer, Integer> plusFour = (integer) -> integer + 4;
+
+        Maybe<Function<Integer, Integer>> maybePlusOne = just(plusOne);
+        Maybe<Function<Integer, Integer>> maybePlusTwo = just(plusTwo);
+        Maybe<Function<Integer, Integer>> maybePlusThree = just(plusThree);
+        Maybe<Function<Integer, Integer>> maybePlusFour = just(plusFour);
+
+
+        Maybe<Integer> maybeSum = maybeOneStringLength
+            // TODO: Compiles, but yields 'java.lang.ClassCastException: land.plainfunctional.monad.MaybeSpecs$1 cannot be cast to land.plainfunctional.monad.Maybe'
+            .apply(
+                new Functor<Function<? super Integer, ? extends Integer>>() {
+                    @Override
+                    public <U> Functor<U> map(Function<? super Function<? super Integer, ? extends Integer>, ? extends U> function) {
+                        return of(
+                            function.apply(
+                                (Function<Integer, Integer>) integer -> integer + 2
+                            )
+                        );
+                    }
+                })
+            .apply(
+                of(
+                    (Function<Integer, Integer>) (int1) -> int1 + maybeTwoStringLength.getOrDefault(0)
+                )
+            )
+            .apply(
+                of(
+                    new Function<Integer, Integer>() {
+                        @Override
+                        public Integer apply(Integer int1) {
+                            return curriedPlus.apply(int1).apply(maybeThreeStringLength.getOrDefault(0));
+                        }
+                    }
+                )
+            )
+            .apply(just(plusFour))
+            //.apply(maybePlusFour) // Compiler won't handle this
+            ;
+
+        assertThat(maybeSum.tryGet()).isEqualTo(3 + 3 + 5 + 4);
+        /
+    }
+    */
+
+    // TODO: ...
+    /*
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeFunctors_2_just() {
         Function<Integer, String> getNegativeNumberInfo =
@@ -452,7 +479,10 @@ class MaybeSpecs {
 
         assertThat(maybeInfoString.tryGet()).isEqualTo("7 is a natural number, 7 is less or equal to 10");
     }
+    */
 
+    // TODO: ...
+    /*
     @Test
     void shouldDoValidationAndStuffLikeThat() {
         Function<String, Function<String, String>> curriedStringAppender =
@@ -491,7 +521,6 @@ class MaybeSpecs {
         assertThat(maybeInfoString.isNothing()).isFalse();
         assertThat(maybeInfoString.tryGet()).isEqualTo("-13 is a negative number");
 
-
         maybeInfoString = just("")
             .apply(just7
                 .map(getGreaterThanTenInfo)
@@ -514,7 +543,6 @@ class MaybeSpecs {
                 )
         );
         assertThat(maybeInfoString.isNothing()).isTrue();
-
 
         // TODO: Possible extension 1
         //String numberInfo = maybeInfoString.transformOrDefault(
@@ -550,6 +578,7 @@ class MaybeSpecs {
         //);
         //assertThat(maybeInfoString.isNothing()).isTrue();
     }
+    */
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -585,41 +614,27 @@ class MaybeSpecs {
      * - 'f' is the monad action function - 'f' has the same (Haskell-style) type signature as 'return': a -> m a
      */
     @Test
-    public void shouldHaveLeftIdentity_nothing() {
+    public void shouldHaveLeftIdentity_0() {
         // f (monad action)
-        Function<String, Maybe<Integer>> f = (ignored) -> nothing();
-
-        // a
-        String value = null;
-
-        // m (Maybe Nothing's data constructor)
-        Function<String, Maybe<String>> m = (s) -> nothing();
-
-        // m a (same as 'nothing()')
-        Maybe<String> m_a = m.apply(value);
-
-        assertThat(m_a.bind(f)).isSameAs(f.apply(value));
-    }
-
-    @Test
-    public void shouldHaveLeftIdentity_just() {
-        // f (monad action)
-        Function<String, Maybe<Integer>> f = (s) -> just(s.length());
+        Function<String, Sequence<Integer>> f = (s) -> Sequence.of(s.length());
 
         // a
         String value = "Blue";
 
-        // m (Maybe Just's data constructor)
-        Function<String, Maybe<String>> m = Maybe::just;
+        // m (Sequence data constructor)
+        Function<String, Sequence<String>> m = Sequence::of;
 
-        // m a (same as 'just(value)')
-        //Maybe<String> m_a = just(value);
-        Maybe<String> m_a = m.apply(value);
+        // m a (same as 'Sequence.of(value)')
+        //Sequence<String> m_a = Sequence.of(value);
+        Sequence<String> m_a = m.apply(value);
 
         assertThat(m_a.bind(f)).isNotSameAs(f.apply(value));
         assertThat(m_a.bind(f)).isEqualTo(f.apply(value));
-    }
 
+        // Bonus
+        assertThat(m_a.bind(f)._unsafe().get(0)).isEqualTo(4);
+        assertThat(f.apply(value)._unsafe().get(0)).isEqualTo(4);
+    }
 
     /**
      * Right identity:
@@ -646,34 +661,24 @@ class MaybeSpecs {
      * - 'm a' is a value in a monad (in a monadic context) - same as 'return a' above
      */
     @Test
-    public void shouldHaveRightIdentity_nothing() {
+    void shouldHaveRightIdentity() {
         // a
-        String value = null;
+        String value = "Go";
 
-        // m (Maybe Nothing's data constructor)
-        Function<String, Maybe<String>> m = (ignored) -> Maybe.nothing();
+        // m (Sequence data constructor)
+        Function<String, Sequence<String>> m = Sequence::of;
 
         // m a
-        Maybe<String> m_a = m.apply(value);
+        Sequence<String> m_a = m.apply(value);
 
-        assertThat(m_a.bind(m)).isSameAs(m_a);
+        //// m.bind(Sequence(_))
+        Sequence<String> lhs = m_a.bind(m);
+
+        Sequence<String> rhs = m_a;
+
+        assertThat(lhs).isNotSameAs(rhs);
+        assertThat(lhs).isEqualTo(rhs);
     }
-
-    @Test
-    public void shouldHaveRightIdentity_just() {
-        // a
-        String value = "myValue";
-
-        // m (Maybe Just's data constructor)
-        Function<String, Maybe<String>> m = Maybe::just;
-
-        // m a
-        Maybe<String> m_a = m.apply(value);
-
-        assertThat(m_a.bind(m)).isNotSameAs(m_a);
-        assertThat(m_a.bind(m)).isEqualTo(m_a);
-    }
-
 
     /**
      * Associativity:
@@ -684,159 +689,64 @@ class MaybeSpecs {
      * (m >>= f) >>= g ≡ m >>= (λx -> f x >>= g)
      */
     @Test
-    public void shouldHaveAssociativity_nothing() {
-        // Monad actions
-        Function<String, Maybe<Integer>> f = s -> just(s.length());
-        Function<Integer, Maybe<Boolean>> g = i -> just(isEven(i));
-
+    void shouldHaveAssociativity() {
         // a
-        String value = "N/A";
+        String value = "Go";
 
-        // m (Maybe Nothing's data constructor)
-        Function<String, Maybe<String>> m = (ignored) -> Maybe.nothing();
+        // m a
+        Sequence<String> m = Sequence.of(value);
 
-        // m a (same as 'M a')
-        Maybe<String> m_a = m.apply(value);
+        Function<String, Sequence<Integer>> f = s -> Sequence.of(s.length());
+        Function<Integer, Sequence<Boolean>> g = i -> Sequence.of(isEven(i));
 
-        Maybe<Boolean> lhs = m_a.bind(f).bind(g);
-        Maybe<Boolean> rhs = m_a.bind((a) -> f.apply(a).bind(g));
-
-        assertThat(lhs).isSameAs(rhs);
-    }
-
-    @Test
-    public void shouldHaveAssociativity_just() {
-        // Monad actions
-        Function<String, Maybe<Integer>> f = s -> just(s.length());
-        Function<Integer, Maybe<Boolean>> g = i -> just(isEven(i));
-
-        // a
-        String value = "myValue";
-
-        // m (Maybe Just's data constructor)
-        Function<String, Maybe<String>> m = Maybe::just;
-
-        // m a (same as 'M a')
-        Maybe<String> m_a = m.apply(value);
-
-        Maybe<Boolean> lhs = m_a.bind(f).bind(g);
-        Maybe<Boolean> rhs = m_a.bind((a) -> f.apply(a).bind(g));
+        Sequence<Boolean> lhs = m.bind(f).bind(g);
+        Sequence<Boolean> rhs = m.bind(x -> f.apply(x).bind(g));
 
         assertThat(lhs).isNotSameAs(rhs);
         assertThat(lhs).isEqualTo(rhs);
+
+        assertThat(lhs.isEmpty()).isFalse();
+        assertThat(lhs.size()).isEqualTo(1L);
+        assertThat(rhs.isEmpty()).isFalse();
+        assertThat(rhs.size()).isEqualTo(1L);
+
+        // Bonus
+        assertThat(lhs._unsafe().get(0)).isTrue(); // => Even number
+        assertThat(rhs._unsafe().get(0)).isTrue(); // => Even number
+
+        // Bonus: Using 'map'
+        Sequence<Boolean> usingMap = m
+            .map(String::length)
+            .map(TestFunctions::isEven);
+        assertThat(usingMap._unsafe().get(0)).isTrue(); // => Even number
     }
 
 
     ///////////////////////////////////////////////////////////////////////////
-    // Fold (catamorphism) semantics
+    // Misc. 'Sequence' applications
     ///////////////////////////////////////////////////////////////////////////
 
     @Test
-    void shouldFoldViaPatternMatching_nothing() {
-        Maybe<String> maybe = of(null);
+    void shouldMapItsValues() {
+        Sequence<String> sequence = Sequence.of("one", "two", "three", "four");
 
-        Integer stringLength =
-            maybe.map(String::length)
-                 .fold(
-                     () -> -1,
-                     (length) -> length
-                 );
+        assertThat(sequence.isEmpty()).isFalse();
+        assertThat(sequence.size()).isEqualTo(4);
 
-        assertThat(stringLength).isEqualTo(-1);
-    }
+        Sequence<Integer> mappedSequence = sequence.map(String::length);
 
-    @Test
-    void getOrDefault_nothing() {
-        assertThat(of(null).getOrDefault("Nope")).isEqualTo("Nope");
-    }
+        assertThat(mappedSequence.isEmpty()).isFalse();
+        assertThat(mappedSequence.size()).isEqualTo(4);
 
-    @Test
-    void shouldFoldViaPatternMatching_just() {
-        Maybe<String> maybe = just("Three");
+        // TODO: 'fold'
+        //int totalLength = mappedSequence.fold(
+        //    () -> ...
+        //);
 
-        Integer stringLength =
-            maybe.map(String::length)
-                 .fold(
-                     () -> -1,
-                     (length) -> length
-                 );
-
-        assertThat(stringLength).isEqualTo(5);
-    }
-
-    @Test
-    void getOrDefault_just() {
-        assertThat(of("Three").getOrDefault("Nope")).isEqualTo("Three");
-    }
-
-    @Test
-    void shouldUsePredicatesAsMapFunctionAsFilter() {
-        Maybe<Integer> maybe10 = nothing();
-        Maybe<Integer> just10 = just(10);
-        Maybe<Integer> just11 = just(11);
-
-
-        Maybe<Boolean> maybeEven = maybe10.map(TestFunctions::isEven);
-
-        //assertThat(maybeEven.tryGet()).isTrue();
-        assertThat(maybeEven.getOrDefault(false)).isFalse();
-        assertThat(maybeEven.getOrNull()).isNull();
-
-
-        maybeEven = just10.map(TestFunctions::isEven);
-
-        assertThat(maybeEven.tryGet()).isTrue();
-        assertThat(maybeEven.getOrDefault(false)).isTrue();
-        assertThat(maybeEven.getOrNull()).isTrue();
-
-
-        maybeEven = just11.map(TestFunctions::isEven);
-
-        assertThat(maybeEven.tryGet()).isFalse();
-        assertThat(maybeEven.getOrDefault(true)).isFalse();
-        assertThat(maybeEven.getOrNull()).isFalse();
-    }
-
-    @Test
-    void shouldUseFoldAsFilter() {
-        //Function<Integer, ?> nullFunction = (ignored) -> null;
-        Supplier<Boolean> nullBooleanSupplier = () -> null;
-        Supplier<?> nullSupplier = () -> null;
-
-
-        Maybe<Integer> maybe10 = nothing();
-        Maybe<Integer> just10 = just(10);
-        Maybe<Integer> just11 = just(11);
-
-        assertThat(nothing(Integer.class).fold(
-            nullBooleanSupplier,
-            TestFunctions::isEven
-        )).isNull();
-
-        assertThat(maybe10.fold(
-            nullBooleanSupplier,
-            TestFunctions::isEven
-        )).isNull();
-
-
-        Boolean isEven = just10.fold(
-            //() -> { throw new IllegalStateException(); },
-            //() -> null,
-            (Supplier<Boolean>) nullSupplier,
-            //nullBooleanSupplier,
-
-            //(Supplier<Boolean>) nullSupplier,
-            TestFunctions::isEven
-        );
-
-        assertThat(isEven).isTrue();
-
-
-        isEven = just11.fold(
-            nullBooleanSupplier,
-            TestFunctions::isEven
-        );
-
-        assertThat(isEven).isFalse();
+        // TODO: 'iterate'
+        //Iterator<Integer> iterator = mappedSequence.iterate();
+        //for(int value: iterator){
+        //    // ...
+        //}
     }
 }

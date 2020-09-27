@@ -80,7 +80,7 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     }
 
     /**
-     * Just for having a typed {@link Maybe} instance to reach the member methods, e.g. <code>pure</code>.
+     * Just for having a (typed) {@link Maybe} instance to reach the member methods, e.g. <code>pure</code>.
      */
     public static <T> Maybe<T> withMaybe(Class<T> type) {
         return nothing();
@@ -133,7 +133,7 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     // Constructors
     ///////////////////////////////////////////////////////
 
-    private Maybe(T value) {
+    protected Maybe(T value) {
         super(value == null
             ? Either.left(null)
             : Either.right(value)
@@ -142,10 +142,12 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
 
 
     ///////////////////////////////////////////////////////////////////////////
-    // Maybe methods
+    // Methods
     ///////////////////////////////////////////////////////////////////////////
 
     /**
+     * Predicate used for pattern matching.
+     *
      * @return 'true' if and only if the 'nothing' data constructor is used, otherwise 'true'
      */
     public boolean isNothing() {
@@ -261,16 +263,23 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     @Override
     public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
         Arguments.requireNotNull(function, "'function' argument cannot be null");
-        return isNothing()
-            ? nothing()
-            : just(function.apply(this.value.tryGet()));
+        //return isNothing()
+        //    ? nothing()
+        //    : just(function.apply(this.value.tryGet()));
 
         // Also possible to implement homomorphism using catamorphism.
         // Because here, the "catamorphism" is accidentally equal to a regular homomorphism...
-        //return fold(
-        //    Maybe::nothing,
-        //    (ignored) -> just(function.apply(this.value.tryGet()))
-        //);
+        return fold(
+            Maybe::nothing,
+            //(ignored) -> just(function.apply(this.value.tryGet()))
+            (ignored) -> just(
+                fold(
+                    //null,
+                    () -> { throw new IllegalStateException(); },
+                    function
+                )
+            )
+        );
     }
 
 

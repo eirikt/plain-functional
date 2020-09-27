@@ -67,6 +67,16 @@ class EitherTests {
     }
 
     @Test
+    void shouldEncapsulateNull_left() {
+        Either<String, LocalDate> left = left(null);
+
+        assertThat(left.isLeft()).isTrue();
+        assertThat(left.isRight()).isFalse();
+
+        assertThat(left.tryGetLeft()).isNull();
+    }
+
+    @Test
     void shouldEncapsulateValue_right() {
         Either<String, LocalDate> right = right(now());
 
@@ -78,23 +88,11 @@ class EitherTests {
     }
 
     @Test
-    void shouldEncapsulateNull_left() {
-        Either<String, LocalDate> left = left(null);
-
-        assertThat(left.isLeft()).isTrue();
-        assertThat(left.isRight()).isFalse();
-
-        assertThat(left.tryGetLeft()).isNull();
-    }
-
-    @Test
-    void shouldEncapsulateNull_right() {
-        Either<String, LocalDate> right = right(null);
-
-        assertThat(right.isLeft()).isFalse();
-        assertThat(right.isRight()).isTrue();
-
-        assertThat(right.tryGet()).isNull();
+    void whenRightIsNullValue_shouldThrowException() {
+        assertThatThrownBy(
+            () -> right(null)
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessageContaining("Cannot create a 'Either.Right' from a 'null' value");
     }
 
     @Test
@@ -178,6 +176,55 @@ class EitherTests {
     Function<Payment, Payment> addAmount = (myPayment) -> myPayment.amount(123.45);
     Function<Payment, Payment> addCardholderName = (myPayment) -> myPayment.cardHolderName("John James");
 
+    /**
+     * Functors must preserve identity morphisms:
+     * map id ≡ id
+     *
+     * equivalent to (like in https://bartoszmilewski.com/2015/01/20/functors/):
+     * f id_a ≡ id_f a
+     *
+     * When performing the mapping operation,
+     * if the values in the functor are mapped to themselves,
+     * the result will be an unmodified functor.
+     */
+    @Test
+    void functorsShouldPreserveIdentityMorphism_left() {
+        //Either<String, Payment> f_id_a = Either.left(Basics.identity("Failure!"));
+        Either<String, Payment> f_id_a = left(Function.<String>identity()
+            .apply("Left"));
+
+        Either<String, Payment> id_f_a = Function.<Either<String, Payment>>identity()
+            .apply(left("Left"));
+
+        assertThat(f_id_a).isNotSameAs(id_f_a);
+        assertThat(f_id_a).isEqualTo(id_f_a);
+
+        // Bonus
+        assertThat(f_id_a.tryGetLeft()).isEqualTo("Left");
+    }
+
+    @Test
+    void functorsShouldPreserveIdentityMorphism_right() {
+        Either<String, Payment> f_id_a = right(Function.<Payment>identity()
+            .apply(new Payment()
+                .amount(123.45)
+            )
+        );
+
+        Either<String, Payment> id_f_a = Function.<Either<String, Payment>>identity()
+            .apply(right(
+                new Payment()
+                    .amount(123.45)
+                )
+            );
+
+        assertThat(f_id_a).isNotSameAs(id_f_a);
+        assertThat(f_id_a).isEqualTo(id_f_a);
+
+        // Bonus
+        assertThat(f_id_a.tryGet().amount).isEqualTo(123.45);
+    }
+
 
     /**
      * Functors must preserve composition of morphisms:
@@ -246,60 +293,6 @@ class EitherTests {
 
         assertThat(F1).isNotSameAs(F2);
         assertThat(F1).isEqualTo(F2);
-    }
-
-
-    /**
-     * Functors must preserve identity morphisms:
-     * map id ≡ id
-     *
-     * equivalent to (like in https://bartoszmilewski.com/2015/01/20/functors/):
-     * F id_a ≡ id_F a
-     *
-     * When performing the mapping operation,
-     * if the values in the functor are mapped to themselves,
-     * the result will be an unmodified functor.
-     */
-    @Test
-    void functorsShouldPreserveIdentityMorphism_left() {
-        // F id_a
-        //Either<String, Payment> F_id_a = Either.left(Basics.identity("Failure!"));
-        Either<String, Payment> F_id_a = left(Function.<String>identity()
-            .apply("Failure"));
-
-        // id_F a
-        Either<String, Payment> id_F_a = Function.<Either<String, Payment>>identity()
-            .apply(left("Failure"));
-
-        assertThat(F_id_a).isNotSameAs(id_F_a);
-        assertThat(F_id_a).isEqualTo(id_F_a);
-
-        // Bonus
-        assertThat(F_id_a.tryGetLeft()).isEqualTo("Failure");
-    }
-
-    @Test
-    void functorsShouldPreserveIdentityMorphism_right() {
-        // F id_a
-        Either<String, Payment> F_id_a = right(Function.<Payment>identity()
-            .apply(new Payment()
-                .amount(123.45)
-            )
-        );
-
-        // id_F a
-        Either<String, Payment> id_F_a = Function.<Either<String, Payment>>identity()
-            .apply(right(
-                new Payment()
-                    .amount(123.45)
-                )
-            );
-
-        assertThat(F_id_a).isNotSameAs(id_F_a);
-        assertThat(F_id_a).isEqualTo(id_F_a);
-
-        // Bonus
-        assertThat(F_id_a.tryGet().amount).isEqualTo(123.45);
     }
 
 
@@ -405,7 +398,7 @@ class EitherTests {
      * ...
      *
      * Java (pseudocode):
-     * (m a).bind(f) ≡ f a
+     * (m a).bind(f) ≡ f(a)
      *
      * Where:
      * - 'm' is the monad (here represented by one of its data constructors)

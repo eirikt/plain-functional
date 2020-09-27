@@ -6,7 +6,10 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 /**
  * An abstract class containing a single protected field of type <code>T</code>.
- * Extend this class and overload the constructor for access.
+ * Extend this class and overload the constructor for access.<br>
+ * <i>NB! Allows <code>null</code>s.</i>
+ *
+ * <p>...</p>
  *
  * <p>
  * A <i>value object</i> is an object where its identity is solely defined by its state.

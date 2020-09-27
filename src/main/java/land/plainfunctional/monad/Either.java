@@ -69,11 +69,15 @@ public interface Either<L, R> extends Monad<R> {
     ///////////////////////////////////////////////////////
 
     /**
+     * Predicate used for pattern matching.
+     *
      * @return 'true' if this 'Either' instance is created by the 'left' data constructor, otherwise 'false'
      */
     boolean isLeft();
 
     /**
+     * Predicate used for pattern matching.
+     *
      * @return 'true' if this 'Either' instance is created by the 'right' data constructor, otherwise 'false'
      */
     boolean isRight();
@@ -180,7 +184,7 @@ public interface Either<L, R> extends Monad<R> {
      */
     class Left<L, R> extends AbstractProtectedValue<L> implements Either<L, R> {
 
-        private Left(L value) {
+        protected Left(L value) {
             super(value);
         }
 
@@ -233,8 +237,9 @@ public interface Either<L, R> extends Monad<R> {
      */
     class Right<L, R> extends AbstractProtectedValue<R> implements Either<L, R> {
 
-        private Right(R value) {
+        protected Right(R value) {
             super(value);
+            Arguments.requireNotNull(value, "Cannot create a 'Either.Right' from a 'null' value");
         }
 
         @Override
@@ -266,7 +271,13 @@ public interface Either<L, R> extends Monad<R> {
         @Override
         public <U> Either<L, U> map(Function<? super R, ? extends U> function) {
             Arguments.requireNotNull(function, "'function' argument cannot be null");
-            return right(function.apply(this.value));
+            return right(
+                fold(
+                    //null,
+                    () -> { throw new IllegalStateException(); },
+                    function
+                )
+            );
         }
 
         @Override
