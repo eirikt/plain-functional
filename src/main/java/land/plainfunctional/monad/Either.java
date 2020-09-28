@@ -29,9 +29,12 @@ import land.plainfunctional.value.AbstractProtectedValue;
  * </p>
  *
  * <p>
+ * Here {@link Either} is the <i>type constructor</i>,
+ * while <code>Left</code> and <code>Right</code> are <i>data constructors</i> (also known as <i>value constructors</i>).
+ * Both data constructors have a parametric type variable <code>a</code>,
+ * making the {@link Either} monad a <code>polymorphic</code> type.
+ * Instances of {@link Either} will either be a <code>Left</code> or a <code>Right</code> value.
  * {@link Either} is the arch-typical <i>sum type</i> (also known as <i>tagged union</i>, <i>disjoint union</i>, <i>variant</i>, <i>coproduct</i>).
- * Both data constructors <code>Left</code> and <code>Right</code> have a parametric type variable,
- * making the {@link Either} functor a <code>polymorphic</code> type.
  * </p>
  *
  * <p>
@@ -41,6 +44,8 @@ import land.plainfunctional.value.AbstractProtectedValue;
  *
  * @param <L> The type of the left value
  * @param <R> The type of the right value
+ * @see <a href="https://hackage.haskell.org/package/base-4.14.0.0/docs/Data-Either.html">Either (Haskell)</a>
+ * @see <a href="https://wiki.haskell.org/Constructor">Haskell constructors</a>
  * @see <a href="https://en.wikipedia.org/wiki/Tagged_union">Sum types</a>
  */
 public interface Either<L, R> extends Monad<R> {

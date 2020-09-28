@@ -16,12 +16,15 @@ import land.plainfunctional.util.Arguments;
  * <p>
  * <i>Functor context:</i>
  * <b>
- * Contains one or more enumerated (possible duplicated) values
+ * Contains none, one, or many enumerated (possible duplicated) values
  * </b>
  * </p>
  *
  * <p>
  * Sequences is also known as <i>lists</i>.
+ * </p>
+ *
+ * <p>
  * ({@link Sequence} delegates to an {@link ArrayList} instance.)
  * </p>
  *
@@ -60,18 +63,24 @@ public class Sequence<T> implements Monad<T> {
         return new Sequence<>();
     }
 
-    // TODO: Possible heap pollution from parameterized vararg type (=> @SafeVarargs)
-    // => https://www.baeldung.com/java-safevarargs
+    /**
+     * @return a {@link Sequence} containing the given single value
+     */
+    public static <T> Sequence<T> of(T value) {
+        return new Sequence<>(value);
+    }
 
     /**
-     * @return a {@link Sequence} containing the given vales
+     * @return a {@link Sequence} containing the given values
      */
+    // TODO: Possible heap pollution from parameterized vararg type (=> @SafeVarargs)
+    // => https://www.baeldung.com/java-safevarargs
     public static <T> Sequence<T> of(T... values) {
         return new Sequence<>(values);
     }
 
     /**
-     * @return a {@link Sequence} containing the given vales
+     * @return a {@link Sequence} containing the given values
      */
     public static <T> Sequence<T> of(Iterable<? extends T> values) {
         return new Sequence<>(values);
@@ -86,6 +95,12 @@ public class Sequence<T> implements Monad<T> {
 
     protected Sequence() {
         this.values = new ArrayList<>();
+    }
+
+    protected Sequence(T value) {
+        this();
+        Arguments.requireNotNull(value, "'Sequence' cannot contain 'null' values");
+        this.values.add(value);
     }
 
     // TODO: Possible heap pollution from parameterized vararg type (=> @SafeVarargs)
@@ -128,7 +143,7 @@ public class Sequence<T> implements Monad<T> {
     /**
      * @return a shallow copy of this sequence (of values)
      */
-    public List<T> asJavaList() {
+    public List<T> toJavaList() {
         return new ArrayList<>(this.values);
     }
 
@@ -164,10 +179,22 @@ public class Sequence<T> implements Monad<T> {
     // Applicative properties
     ///////////////////////////////////////////////////////
 
+    //public Sequence<T> pure() {
+    //    return new Sequence<>();
+    //}
+
     @Override
     public Sequence<T> pure(T value) {
         return new Sequence<>(value);
     }
+
+    //public Sequence<T> pure(T... values) {
+    //    return new Sequence<>(values);
+    //}
+
+    //public Sequence<T> pure(Iterable<? extends T> iterable) {
+    //    return new Sequence<>(iterable);
+    //}
 
     @Override
     public <U> Sequence<U> apply(Applicative<Function<? super T, ? extends U>> functionInContext) {

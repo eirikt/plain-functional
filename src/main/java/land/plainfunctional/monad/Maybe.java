@@ -29,9 +29,9 @@ import land.plainfunctional.value.AbstractProtectedValue;
  * <p>
  * Here {@link Maybe} is the <i>type constructor</i>,
  * while <code>Nothing</code> and <code>Just</code> are <i>data constructors</i> (also known as <i>value constructors</i>).
- * We may regard <code>Nothing</code> as a constant as it is a <i>nullary</i> data constructor.
+ * We may regard <code>Nothing</code> as a constant as it is a <i>"nullary"</i> data constructor.
  * <code>Just</code> on the other hand, has a parametric type variable <code>a</code>,
- * making the {@link Maybe} functor a <code>polymorphic</code> type.
+ * making the {@link Maybe} monad a <code>polymorphic</code> type.
  * Instances of {@link Maybe} will either be a <code>Nothing</code> or a <code>Just</code> value,
  * so {@link Maybe} is a <i>sum type</i> (also known as <i>tagged union</i>, <i>disjoint union</i>, <i>variant</i>, <i>coproduct</i>).
  * </p>
@@ -39,7 +39,7 @@ import land.plainfunctional.value.AbstractProtectedValue;
  * <p>
  * {@link Maybe} may be seen as a specialization of the {@link Either} monad,
  * and is implemented accordingly in this library.
- * ({@link Maybe} delegates to an {@link Either} instance.)
+ * ({@link Maybe} "inherits" (via subclass polymorphism) an {@link Either} instance.)
  * </p>
  *
  * <p>

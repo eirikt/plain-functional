@@ -7,12 +7,11 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 /**
  * An abstract class containing a single protected field of type <code>T</code>.
  * Extend this class and overload the constructor for access.<br>
- * <i>NB! Allows <code>null</code>s.</i>
  *
  * <p>...</p>
  *
  * <p>
- * A <i>value object</i> is an object where its identity is solely defined by its state.
+ * A <i>value object</i> is an object whose identity is solely defined by its state.
  * </p>
  *
  * <p>
@@ -31,7 +30,18 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
  * Entity objects are mutable by default, as they cannot be discarded/recreated as easily as value objects can.
  * </p>
  *
+ * <p>...</p>
+ *
+ * <p>
+ * <i>NB! {@link AbstractProtectedValue} do allow <code>null</code>s.</i>
+ * <code>null</code> is a "bottom" (⊥) type/value in Java.
+ * It is a subclass of all types, and represents absence of any information.
+ * </p>
+ *
  * @param <T> The value type
+ * @see <a href="https://functionalprogramming.now.sh/1-functions-and-values#values">Values</a>
+ * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type (Wikipedia)</a>
+ *
  */
 public abstract class AbstractProtectedValue<T> {
 

@@ -1,13 +1,20 @@
 package land.plainfunctional.monad;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Iterator;
+import java.util.List;
 import java.util.function.Function;
+import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.Test;
 
 import land.plainfunctional.testdomain.TestFunctions;
 
+import static java.time.Duration.between;
+import static java.time.Instant.now;
+import static java.util.Arrays.stream;
+import static land.plainfunctional.monad.Sequence.empty;
+import static land.plainfunctional.monad.Sequence.of;
 import static land.plainfunctional.monad.Sequence.withSequence;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,26 +27,26 @@ class SequenceTests {
     ///////////////////////////////////////////////////////////////////////////
 
     @Test
-    void shouldProhobitNullValues() {
-        assertThatThrownBy(() -> Sequence.of((String) null))
+    void shouldProhibitNullValues() {
+        assertThatThrownBy(() -> of((String) null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("'Sequence' cannot contain 'null' values");
 
-        assertThatThrownBy(() -> Sequence.of("Value1", null, "Value2"))
+        assertThatThrownBy(() -> of("Value1", null, "Value2"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("'Sequence' cannot contain 'null' values");
     }
 
     @Test
     void shouldBeEmpty() {
-        Sequence<Integer> emptySequence = Sequence.of();
+        Sequence<Integer> emptySequence = of();
 
         assertThat(emptySequence).isNotNull();
         assertThat(emptySequence.isEmpty()).isTrue();
         assertThat(emptySequence.size()).isEqualTo(0);
 
 
-        Sequence<Integer> emptySequence2 = Sequence.empty();
+        Sequence<Integer> emptySequence2 = empty();
 
         assertThat(emptySequence2).isNotNull();
         assertThat(emptySequence2.isEmpty()).isTrue();
@@ -48,7 +55,7 @@ class SequenceTests {
 
     @Test
     void shouldContainValue() {
-        Sequence<String> sequence = Sequence.of("Single value");
+        Sequence<String> sequence = of("Single value");
 
         assertThat(sequence.isEmpty()).isFalse();
         assertThat(sequence.size()).isEqualTo(1);
@@ -56,7 +63,7 @@ class SequenceTests {
 
     @Test
     void shouldContainValues() {
-        Sequence<Integer> sequence = Sequence.of(1, 2, 3, 4, 5, 6);
+        Sequence<Integer> sequence = of(1, 2, 3, 4, 5, 6);
 
         assertThat(sequence.isEmpty()).isFalse();
         assertThat(sequence.size()).isEqualTo(6);
@@ -82,9 +89,9 @@ class SequenceTests {
      */
     @Test
     void functorsShouldPreserveIdentityMorphism() {
-        Sequence<String> f_id_a = Sequence.of(Function.<String>identity().apply("yes"));
+        Sequence<String> f_id_a = of(Function.<String>identity().apply("yes"));
 
-        Sequence<String> id_f_a = Function.<Sequence<String>>identity().apply(Sequence.of("yes"));
+        Sequence<String> id_f_a = Function.<Sequence<String>>identity().apply(of("yes"));
 
         assertThat(f_id_a).isNotSameAs(id_f_a);
         assertThat(f_id_a).isEqualTo(id_f_a);
@@ -107,7 +114,7 @@ class SequenceTests {
      */
     @Test
     void functorsShouldPreserveCompositionOfMorphisms() {
-        Sequence<Integer> sequence3 = Sequence.of(3, 4);
+        Sequence<Integer> sequence3 = of(3, 4);
 
         Function<Integer, Integer> plus13 = myInt -> myInt + 13;
         Function<Integer, Integer> minus5 = myInt -> myInt - 5;
@@ -616,7 +623,7 @@ class SequenceTests {
     @Test
     public void shouldHaveLeftIdentity_0() {
         // f (monad action)
-        Function<String, Sequence<Integer>> f = (s) -> Sequence.of(s.length());
+        Function<String, Sequence<Integer>> f = (s) -> of(s.length());
 
         // a
         String value = "Blue";
@@ -694,10 +701,10 @@ class SequenceTests {
         String value = "Go";
 
         // m a
-        Sequence<String> m = Sequence.of(value);
+        Sequence<String> m = of(value);
 
-        Function<String, Sequence<Integer>> f = s -> Sequence.of(s.length());
-        Function<Integer, Sequence<Boolean>> g = i -> Sequence.of(isEven(i));
+        Function<String, Sequence<Integer>> f = s -> of(s.length());
+        Function<Integer, Sequence<Boolean>> g = i -> of(isEven(i));
 
         Sequence<Boolean> lhs = m.bind(f).bind(g);
         Sequence<Boolean> rhs = m.bind(x -> f.apply(x).bind(g));
@@ -728,7 +735,7 @@ class SequenceTests {
 
     @Test
     void shouldMapItsValues() {
-        Sequence<String> sequence = Sequence.of("one", "two", "three", "four");
+        Sequence<String> sequence = of("one", "two", "three", "four");
 
         assertThat(sequence.isEmpty()).isFalse();
         assertThat(sequence.size()).isEqualTo(4);
@@ -737,16 +744,131 @@ class SequenceTests {
 
         assertThat(mappedSequence.isEmpty()).isFalse();
         assertThat(mappedSequence.size()).isEqualTo(4);
+    }
 
-        // TODO: 'fold'
-        //int totalLength = mappedSequence.fold(
-        //    () -> ...
-        //);
+    @Test
+    void shouldBeTransformedToJavaUtilList() {
+        Sequence<Integer> sequence = of("one", "two", "three", "four")
+            .map(String::length);
 
-        // TODO: 'iterate'
-        //Iterator<Integer> iterator = mappedSequence.iterate();
-        //for(int value: iterator){
-        //    // ...
-        //}
+        List<Integer> list = sequence.toJavaList();
+
+        // => Get by index
+        assertThat(list.get(0)).isEqualTo(3);
+        assertThat(list.get(1)).isEqualTo(3);
+        assertThat(list.get(2)).isEqualTo(5);
+        assertThat(list.get(3)).isEqualTo(4);
+
+        // => Iteration
+        int sum = 0;
+        for (int value : list) {
+            sum += value;
+        }
+        assertThat(sum).isEqualTo(3 + 3 + 5 + 4);
+
+        // => Reduction
+        sum = list.stream().reduce(0, Integer::sum);
+        assertThat(sum).isEqualTo(3 + 3 + 5 + 4);
+    }
+
+    // TODO: ...
+    @Test
+    void shouldFold() {
+        int range = 0;
+        long rangeSum = 0;
+        //int range = 1;
+        //long rangeSum = 1;
+        //int range = 100;
+        //long rangeSum = 1000; // ?
+
+        // Sum of int range: Regular Java (with shortcuts)
+        Instant start = now();
+        long sum = 0;
+        for (int i = 1; i <= range; i += 1) {
+            sum = sum + i;
+        }
+        //System.out.printf("Sum of int range: Regular Java (with shortcuts), took %d ns%n", between(start, now()).toNanos());
+        System.out.printf("Sum of int range: Regular Java (with shortcuts), took %d ms%n", between(start, now()).toMillis());
+        assertThat(sum).isEqualTo(rangeSum);
+
+
+        // Sum of int range: Regular Java
+        start = now();
+        long[] ints = new long[range + 1]; // 0-based
+        sum = 0;
+        for (int i = 1; i <= range; i += 1) {
+            ints[i] = i; // [0..range]
+        }
+        for (int i = 1; i <= range; i += 1) {
+            sum = sum + ints[i];
+        }
+        //System.out.printf("Sum of int range: Regular Java, took %d ns%n", between(start, now()).toNanos());
+        System.out.printf("Sum of int range: Regular Java, took %d ms%n", between(start, now()).toMillis());
+        assertThat(ints.length).isEqualTo(range + 1); // 0-based
+        assertThat(sum).isEqualTo(rangeSum);
+
+
+        // Sum of long range: Regular Java (via loads of helpers)
+        start = now();
+        ints = LongStream.rangeClosed(0, range).toArray(); // [0..range]
+        sum = stream(ints).sum();
+        //System.out.printf("Sum of int range: Regular Java (via loads of helpers), took %d ns%n", between(start, now()).toNanos());
+        System.out.printf("Sum of int range: Regular Java (via loads of helpers), took %d ms%n", between(start, now()).toMillis());
+        assertThat(ints.length).isEqualTo(range + 1); // 0-based
+        assertThat(sum).isEqualTo(rangeSum);
+
+
+        // TODO:
+        /*
+        // Sum of long range: Plain functional Java
+        start = now();
+        Sequence<Long> sequence = empty();
+        for (long i = 1; i <= range; i += 1) {
+            Sequence<Long> sequenceOfLongs = Sequence.of(i);
+            sequence = sequence.append(sequenceOfLongs);
+
+            // TODO: Try:
+            //sequence = sequence.append(Sequence.of(just(i)));
+            //sequence = sequence.append(sequence.pure(just(i)));
+        }
+        sum = sequence.toMonoid(
+            0,
+            (long1, long2) -> {
+                return long1 + long2;
+            }
+        ).fold();
+        //System.out.printf("Sum of int range: Plain functional Java, took %d ns%n", between(start, now()).toNanos());
+        System.out.printf("Sum of int range: Plain functional Java, took %d ms%n", between(start, now()).toMillis());
+        assertThat(ints.length).isEqualTo(range + 1); // 0-based
+        assertThat(sum).isEqualTo(rangeSum);
+        */
+
+
+        // TODO:
+        /*
+        // Sum of long range: Plain functional Java (sequence of maybe values)
+        start = now();
+        Sequence<Maybe<Long>> sequence = empty();
+        for (long i = 1; i <= range; i += 1) {
+            Maybe<Long> justlong = just(i);
+            Sequence<Maybe<Long>> sequenceOfJustLongs = Sequence.of(singletonList(justlong));
+            //Sequence<Maybe<Long>> sequenceOfJustLongs = of(justlong);
+            sequence = sequence.append(sequenceOfJustLongs);
+
+            // TODO: Try:
+            //sequence = sequence.append(Sequence.of(just(i)));
+            //sequence = sequence.append(sequence.pure(just(i)));
+        }
+        sum = sequence.toMonoid(
+            0,
+            (maybeLong1, maybeLong2) -> {
+                return maybeLong1.tryGet() + maybeLong2.tryGet();
+            }
+        ).fold();
+        //System.out.printf("Sum of int range: Plain functional Java, took %d ns%n", between(start, now()).toNanos());
+        System.out.printf("Sum of int range: Plain functional Java, took %d ms%n", between(start, now()).toMillis());
+        assertThat(ints.length).isEqualTo(range + 1); // 0-based
+        assertThat(sum).isEqualTo(rangeSum);
+        */
     }
 }

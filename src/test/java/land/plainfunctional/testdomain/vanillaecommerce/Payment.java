@@ -8,6 +8,9 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 import static java.lang.String.format;
 
+/**
+ * An immutable payment class.
+ */
 public class Payment {
 
     /**

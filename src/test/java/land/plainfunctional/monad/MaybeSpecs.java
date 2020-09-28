@@ -91,7 +91,7 @@ class MaybeSpecs {
      * NB! Avoiding mutating shared state is the application logic's responsibility! Sorry!
      *
      * This may be accomplished e.g. via immutable domain classes.
-     * See the {@link land.plainfunctional.testdomain.vanillaecommerce} test package on examples how to do that.
+     * TODO: See the {@link land.plainfunctional.testdomain.vanillaecommerce} test package on examples how to do that.
      */
     @Test
     void willMutateArgumentsIfAllowedToDoThat() {
