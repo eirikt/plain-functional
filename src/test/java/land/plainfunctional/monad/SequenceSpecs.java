@@ -1,18 +1,13 @@
 package land.plainfunctional.monad;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.Test;
 
 import land.plainfunctional.testdomain.TestFunctions;
 
-import static java.time.Duration.between;
-import static java.time.Instant.now;
-import static java.util.Arrays.stream;
 import static land.plainfunctional.monad.Sequence.empty;
 import static land.plainfunctional.monad.Sequence.of;
 import static land.plainfunctional.monad.Sequence.withSequence;
@@ -20,7 +15,7 @@ import static land.plainfunctional.testdomain.TestFunctions.isEven;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class SequenceTests {
+class SequenceSpecs {
 
     ///////////////////////////////////////////////////////////////////////////
     // Sequence properties
@@ -772,14 +767,26 @@ class SequenceTests {
     }
 
     // TODO: ...
+    /*
     @Test
-    void shouldFold() {
-        int range = 0;
-        long rangeSum = 0;
+    void shouldFoldPrimitives() {
+        //int range = 0;
+        //long rangeSum = 0;
         //int range = 1;
         //long rangeSum = 1;
+        //int range = 10;
+        //long rangeSum = 55;
         //int range = 100;
-        //long rangeSum = 1000; // ?
+        //long rangeSum = 5_050;
+        //int range = 1_000;
+        //long rangeSum = 500_500;
+        int range = 10_000;
+        long rangeSum = 50_005_000;
+        //int range = 100_000;
+        //long rangeSum = 5_000_050_000L;
+        //int range = 1_000_000;
+        //long rangeSum = 500_000_500_000L;
+
 
         // Sum of int range: Regular Java (with shortcuts)
         Instant start = now();
@@ -787,88 +794,120 @@ class SequenceTests {
         for (int i = 1; i <= range; i += 1) {
             sum = sum + i;
         }
+        System.out.println();
         //System.out.printf("Sum of int range: Regular Java (with shortcuts), took %d ns%n", between(start, now()).toNanos());
         System.out.printf("Sum of int range: Regular Java (with shortcuts), took %d ms%n", between(start, now()).toMillis());
         assertThat(sum).isEqualTo(rangeSum);
 
 
         // Sum of int range: Regular Java
-        start = now();
+        Instant startGenerating = now();
         long[] ints = new long[range + 1]; // 0-based
         sum = 0;
         for (int i = 1; i <= range; i += 1) {
             ints[i] = i; // [0..range]
         }
+        Instant startProcessing = now();
         for (int i = 1; i <= range; i += 1) {
             sum = sum + ints[i];
         }
+        System.out.println();
         //System.out.printf("Sum of int range: Regular Java, took %d ns%n", between(start, now()).toNanos());
-        System.out.printf("Sum of int range: Regular Java, took %d ms%n", between(start, now()).toMillis());
+        System.out.printf("Sum of int range: Regular Java, generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("Sum of int range: Regular Java, processing took %d ms%n", between(startProcessing, now()).toMillis());
         assertThat(ints.length).isEqualTo(range + 1); // 0-based
         assertThat(sum).isEqualTo(rangeSum);
 
 
         // Sum of long range: Regular Java (via loads of helpers)
-        start = now();
+        startGenerating = now();
         ints = LongStream.rangeClosed(0, range).toArray(); // [0..range]
+        startProcessing = now();
         sum = stream(ints).sum();
+        System.out.println();
         //System.out.printf("Sum of int range: Regular Java (via loads of helpers), took %d ns%n", between(start, now()).toNanos());
-        System.out.printf("Sum of int range: Regular Java (via loads of helpers), took %d ms%n", between(start, now()).toMillis());
+        System.out.printf("Sum of int range: Regular Java (via loads of helpers), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("Sum of int range: Regular Java (via loads of helpers), processing took %d ms%n", between(startProcessing, now()).toMillis());
         assertThat(ints.length).isEqualTo(range + 1); // 0-based
         assertThat(sum).isEqualTo(rangeSum);
 
 
-        // TODO:
-        /*
+        // Sum of long range: Plain functional Java (with ready-made array)
+        List<Long> listOfLongs = new ArrayList<>();
+        for (long i = 1; i <= range; i += 1) {
+            listOfLongs.add(i);
+        }
+        startGenerating = now();
+        Sequence<Long> sequenceOfLongs = of(listOfLongs);
+        startProcessing = now();
+        sum = sequenceOfLongs.toMonoid(Long::sum, 0L).foldLeft();
+        System.out.println();
+        //System.out.printf("Sum of int range: Plain functional Java, took %d ns%n", between(start, now()).toNanos());
+        System.out.printf("Sum of int range: Plain functional Java (with ready-made array), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("Sum of int range: Plain functional Java (with ready-made array), processing took %d ms%n", between(startProcessing, now()).toMillis());
+        assertThat(ints.length).isEqualTo(range + 1); // 0-based
+        assertThat(sum).isEqualTo(rangeSum);
+
+
         // Sum of long range: Plain functional Java
-        start = now();
+        startGenerating = now();
         Sequence<Long> sequence = empty();
         for (long i = 1; i <= range; i += 1) {
-            Sequence<Long> sequenceOfLongs = Sequence.of(i);
-            sequence = sequence.append(sequenceOfLongs);
-
-            // TODO: Try:
-            //sequence = sequence.append(Sequence.of(just(i)));
-            //sequence = sequence.append(sequence.pure(just(i)));
+            //sequenceOfLongs = of(i);
+            //sequence = sequence.append(sequenceOfLongs);
+            sequence = sequence.append(of(i));
+            //sequence = sequence.append(sequence.pure(i));
         }
-        sum = sequence.toMonoid(
-            0,
-            (long1, long2) -> {
-                return long1 + long2;
-            }
-        ).fold();
+        startProcessing = now();
+        sum = sequence.toMonoid(Long::sum, 0L).foldLeft();
+        System.out.println();
         //System.out.printf("Sum of int range: Plain functional Java, took %d ns%n", between(start, now()).toNanos());
-        System.out.printf("Sum of int range: Plain functional Java, took %d ms%n", between(start, now()).toMillis());
+        System.out.printf("Sum of int range: Plain functional Java, generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("Sum of int range: Plain functional Java, processing took %d ms%n", between(startProcessing, now()).toMillis());
         assertThat(ints.length).isEqualTo(range + 1); // 0-based
         assertThat(sum).isEqualTo(rangeSum);
-        */
 
 
-        // TODO:
-        /*
         // Sum of long range: Plain functional Java (sequence of maybe values)
-        start = now();
-        Sequence<Maybe<Long>> sequence = empty();
+        BinaryOperator<Long> longSum = Long::sum;
+
+        Function<Long, Function<Long, Long>> curriedLongSum =
+            (long1) ->
+                //(long2) -> long1 + long2;
+                (long2) -> longSum.apply(long1, long2);
+
+        startGenerating = now();
+        Sequence<Maybe<Long>> sequenceOfMaybeLongs = empty();
         for (long i = 1; i <= range; i += 1) {
             Maybe<Long> justlong = just(i);
-            Sequence<Maybe<Long>> sequenceOfJustLongs = Sequence.of(singletonList(justlong));
-            //Sequence<Maybe<Long>> sequenceOfJustLongs = of(justlong);
-            sequence = sequence.append(sequenceOfJustLongs);
+            //Sequence<Maybe<Long>> sequenceOfJustLongs = of(singletonList(justlong));
+            Sequence<Maybe<Long>> sequenceOfJustLongs = of(justlong);
+            sequenceOfMaybeLongs = sequenceOfMaybeLongs.append(sequenceOfJustLongs);
 
             // TODO: Try:
             //sequence = sequence.append(Sequence.of(just(i)));
             //sequence = sequence.append(sequence.pure(just(i)));
         }
-        sum = sequence.toMonoid(
-            0,
-            (maybeLong1, maybeLong2) -> {
-                return maybeLong1.tryGet() + maybeLong2.tryGet();
-            }
-        ).fold();
+        startProcessing = now();
+        sum = sequenceOfMaybeLongs.toMonoid(
+            //(maybeLong1, maybeLong2) -> just(maybeLong1.tryGet() + maybeLong2.tryGet())
+            (maybeLong1, maybeLong2) -> maybeLong1.apply(maybeLong2.map(curriedLongSum)),
+            just(0L)
+        ).foldLeft().tryGet();
+        System.out.println();
         //System.out.printf("Sum of int range: Plain functional Java, took %d ns%n", between(start, now()).toNanos());
-        System.out.printf("Sum of int range: Plain functional Java, took %d ms%n", between(start, now()).toMillis());
+        System.out.printf("Sum of int range: Plain functional Java (sequence of maybe values), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("Sum of int range: Plain functional Java (sequence of maybe values), processing took %d ms%n", between(startProcessing, now()).toMillis());
         assertThat(ints.length).isEqualTo(range + 1); // 0-based
         assertThat(sum).isEqualTo(rangeSum);
-        */
     }
+    */
+
+    // TODO: ...
+    /*
+    @Test
+    void shouldFoldProductTypes() {
+        fail();
+    }
+    */
 }

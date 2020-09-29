@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 
-class EitherTests {
+class EitherSpecs {
 
     @Test
     void shouldCompile() {
@@ -366,10 +366,11 @@ class EitherTests {
                 .map(curriedStringAppender))
             .fold(
                 () -> left(null),
-                (string) -> isNotBlank(string) ? left(string) : right(null)
+                (string) -> isNotBlank(string) ? left(string) : right("")
             );
 
-        assertThat(eitherInfoString.tryGet()).isNull();
+        assertThat(eitherInfoString.tryGet()).isNotNull();
+        assertThat(eitherInfoString.tryGet()).isBlank();
     }
 
 

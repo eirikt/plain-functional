@@ -278,7 +278,6 @@ public interface Either<L, R> extends Monad<R> {
             Arguments.requireNotNull(function, "'function' argument cannot be null");
             return right(
                 fold(
-                    //null,
                     () -> { throw new IllegalStateException(); },
                     function
                 )

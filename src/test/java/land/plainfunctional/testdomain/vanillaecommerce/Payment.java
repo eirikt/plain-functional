@@ -7,6 +7,7 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 import static java.lang.String.format;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
  * An immutable payment class.
@@ -114,6 +115,34 @@ public class Payment {
             amount,
             this.isPaymentReceived
         );
+    }
+
+
+    public Payment append(Payment payment) {
+        String cardNumber = this.cardNumber;
+        String cardHolderName = this.cardHolderName;
+        LocalDate expirationDate = this.expirationDate;
+        Integer cvc = this.cvc;
+        Double amount = this.amount;
+        boolean isPaymentReceived = this.isPaymentReceived;
+
+        if (isBlank(cardNumber)) {
+            cardNumber = payment.cardNumber;
+        }
+        if (isBlank(cardHolderName)) {
+            cardHolderName = payment.cardHolderName;
+        }
+        if (expirationDate == null) {
+            expirationDate = payment.expirationDate;
+        }
+        if (cvc == null) {
+            cvc = payment.cvc;
+        }
+        if (amount == null) {
+            amount = payment.amount;
+        }
+
+        return new Payment(cardNumber, cardHolderName, expirationDate, cvc, amount, isPaymentReceived);
     }
 
 
