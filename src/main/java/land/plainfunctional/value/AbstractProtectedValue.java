@@ -2,7 +2,9 @@ package land.plainfunctional.value;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+
+import static org.apache.commons.lang3.builder.ToStringStyle.SHORT_PREFIX_STYLE;
 
 /**
  * An abstract class containing a single protected field of type <code>T</code>.
@@ -41,7 +43,6 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
  * @param <T> The value type
  * @see <a href="https://functionalprogramming.now.sh/1-functions-and-values#values">Values</a>
  * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type (Wikipedia)</a>
- *
  */
 public abstract class AbstractProtectedValue<T> {
 
@@ -75,6 +76,10 @@ public abstract class AbstractProtectedValue<T> {
 
     @Override
     public String toString() {
-        return new ReflectionToStringBuilder(this).toString();
+        return ToStringBuilder
+            .reflectionToString(this,
+                SHORT_PREFIX_STYLE,
+                true
+            );
     }
 }
