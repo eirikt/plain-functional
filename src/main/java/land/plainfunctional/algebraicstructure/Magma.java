@@ -10,15 +10,23 @@ import land.plainfunctional.util.Arguments;
  * A magma consists of a set of values equipped with a single binary operation that must be <i>closed</i> by definition.
  *
  * <p>
- * <i>Formally:</i> To qualify as a magma, the set 𝕊 and the binary operation • must satisfy the following requirement, known as the <i>magma-</i> or <i>closure axiom</i>:<br>
+ * <i>Formally:</i> To qualify as a magma, the set 𝕊 and the binary operation • must satisfy the following requirement, known as the <i>magma-</i>, <i>totality-</i> or <i>closure axiom</i>:<br>
  * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∀(𝓍,𝓎) ∈ 𝕊 ⇒ 𝓍•𝓎 ∈ 𝕊
  * </p>
  *
  * <p>
- * For all 𝓍,𝓎 ∈ 𝕊, the result of the operation 𝓍•𝓎 is (also) an element in 𝕊.<br>
- * When regarding <i>types as sets of values</i>, one sees that this is equivalent with returning the same type.
+ * For all 𝓍,𝓎 ∈ 𝕊, the result of the operation 𝓍•𝓎 is (also) an element in 𝕊.
+ * </p>
+ *
+ * <p>
  * Functions whose domain is equal to its codomain, are known as <i>endofunctions</i>.
- * (A homomorphic endofunction is an <i>endomorphism</i>, which is the usually the case).
+ * (A homomorphic endofunction is an <i>endomorphism</i>, and is the usually the case).
+ * </p>
+ *
+ * <p>
+ * The magma operation can be regarded as <i>addition</i>,
+ * and could have been named <code>add</code> (or <code>merge</code>).
+ * <code>append</code> is chosen because it is the more generic term.
  * </p>
  *
  * @param <T> The magma type
@@ -27,46 +35,67 @@ import land.plainfunctional.util.Arguments;
  * @see <a href="https://en.wikipedia.org/wiki/Magma_(algebra)">Magma (Wikipedia)</a>
  * @see <a href="https://en.wikipedia.org/wiki/Endomorphism">Endomorphism (Wikipedia)</a>
  * @see <a href="https://en.wikipedia.org/wiki/Homomorphism">Homomorphism (Wikipedia)</a>
+ * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
  */
 public class Magma<T> {
 
     /**
-     * The magma set.
+     * This magma's set.
      */
     protected final Set<T> set;
 
     /**
-     * The binary operation, making this set-of-values a magma.
-     * The totality/closure property ("closed") which the binary operation also must inhibit,
-     * is enforced via the {@link BinaryOperator} class.
+     * This magma's binary operation.
+     *
+     * <p>
+     * The totality/closure property which the binary operation also must inhibit,
+     * is enforced via the single-parametric {@link BinaryOperator} class,
+     * in addition to internal constraints defined in the <code>append</code> method.
+     * </p>
      */
     protected final BinaryOperator<T> closedBinaryOperation;
 
     public Magma(Set<T> set, BinaryOperator<T> closedBinaryOperation) {
-        Arguments.requireNotNull(set, "A 'Magma' instance must have a set of values");
-        Arguments.requireNotNull(closedBinaryOperation, "A 'Magma' instance must have a closed binary operation");
+        Arguments.requireNotNull(set, "A magma must have a set of values");
+        Arguments.requireNotNull(closedBinaryOperation, "A magma must have a closed binary operation");
         this.set = set;
         this.closedBinaryOperation = closedBinaryOperation;
     }
 
     /**
-     * Application of this magma's operation.
+     * Application of this magma's operation, a constrained <i>endofunction</i>.
      *
      * <p>
-     * <i>NB! The arguments must be elements of this magma.</i>
+     * <i>
+     * NB! Partial method:<br>
+     * The parameter values as well as the result must be actual elements of this magma.
+     * </i><br>
+     * Violations of this rule will result in a <i>bottom</i> value&mdash;here runtime exceptions.
      * </p>
      *
+     * @param element1 a magma element
+     * @param element2 a magma element
+     * @return a resulting magma element, or a bottom value if the result is not an element of the magma
      * @throws IllegalArgumentException if one or both of the arguments are not elements of this magma
+     * @throws IllegalStateException    if the result of the applied operation is not element of this magma
      */
-    public T append(T value1, T value2) {
-        Arguments.requireNotNull(value1, "'value1' argument cannot be 'null'");
-        Arguments.requireNotNull(value2, "'value2' argument cannot be 'null'");
-        if (!this.set.contains(value1)) {
-            throw new IllegalArgumentException("'value1' argument is not an element of this magma");
+    public T append(T element1, T element2) {
+        Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");
+        Arguments.requireNotNull(element2, "'element2' argument cannot be 'null'");
+
+        if (this.set.parallelStream().noneMatch(element1::equals)) {
+            throw new IllegalArgumentException("'element1' argument is not an element of this magma");
         }
-        if (!this.set.contains(value2)) {
-            throw new IllegalArgumentException("'value2' argument is not an element of this magma");
+        if (this.set.parallelStream().noneMatch(element2::equals)) {
+            throw new IllegalArgumentException("'element2' argument is not an element of this magma");
         }
-        return this.closedBinaryOperation.apply(value1, value2);
+
+        T result = this.closedBinaryOperation.apply(element1, element2);
+
+        if (this.set.parallelStream().noneMatch(result::equals)) {
+            throw new IllegalStateException("The result of the applied binary operation is not an element of this magma");
+        }
+
+        return result;
     }
 }

@@ -1,45 +1,49 @@
 package land.plainfunctional.algebraicstructure;
 
-import java.time.LocalDate;
 import java.util.HashSet;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
-
-import land.plainfunctional.testdomain.vanillaecommerce.Payment;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
+import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MagmaSpecs {
 
-    //@Test
-    void shouldNotCompile_1() {
+    ///////////////////////////////////////////////////////////////////////////
+    // Construction
+    ///////////////////////////////////////////////////////////////////////////
+
+    void emptyConstructor_shouldNotCompile() {
         //Magma<String> magma = new Magma<>();
-        assertThat(true).isTrue();
     }
 
-    //@Test
-    void shouldNotCompile_2() {
+    void unaryConstructor_shouldNotCompile() {
         //Magma<String> magma = new Magma<>(null);
-        assertThat(true).isTrue();
     }
+
+    @Test
+    void binaryConstructor_whenNullArgs_shouldThrowException() {
+        assertThatThrownBy(() -> new Magma<>(null, null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("A magma must have a set of values");
+
+        assertThatThrownBy(() -> new Magma<>(emptySet(), null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("A magma must have a closed binary operation");
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Totality / Closure
+    ///////////////////////////////////////////////////////////////////////////
 
     @Test
     void whenNullArgs_shouldThrowException() {
-        assertThatThrownBy(() -> new Magma<>(null, null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A 'Magma' instance must have a set of values");
-
-        assertThatThrownBy(() -> new Magma<>(new HashSet<>(), null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A 'Magma' instance must have a closed binary operation");
-    }
-
-    @Test
-    void append_whenNullArgs_shouldThrowException() {
         Magma<String> emptyStringAppendingMagma = new Magma<>(
             emptySet(),
             (string1, string2) -> string1 + string2
@@ -47,15 +51,19 @@ class MagmaSpecs {
 
         assertThatThrownBy(() -> emptyStringAppendingMagma.append(null, null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'value1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be 'null'");
 
         assertThatThrownBy(() -> emptyStringAppendingMagma.append("foo", null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'value2' argument cannot be 'null'");
+            .hasMessage("'element2' argument cannot be 'null'");
+
+        assertThatThrownBy(() -> emptyStringAppendingMagma.append(null, "foo"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("'element1' argument cannot be 'null'");
     }
 
     @Test
-    void append_whenUnknownArgs_shouldThrowException() {
+    void whenUnknownArgs_shouldThrowException() {
         Magma<String> stringAppendingMagma = new Magma<>(
             singleton("foo"),
             (string1, string2) -> string1 + string2
@@ -63,57 +71,66 @@ class MagmaSpecs {
 
         assertThatThrownBy(() -> stringAppendingMagma.append("foo", "bar"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'value2' argument is not an element of this magma");
+            .hasMessage("'element2' argument is not an element of this magma");
 
         assertThatThrownBy(() -> stringAppendingMagma.append("bar", "foo"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'value1' argument is not an element of this magma");
+            .hasMessage("'element1' argument is not an element of this magma");
     }
 
     @Test
-    void append_shouldAppend_1() {
+    void whenUnknownResult_shouldThrowException() {
         Magma<String> stringAppendingMagma = new Magma<>(
-            new HashSet<>(asList("foo", "bar")),
+            Stream.of("foo", "bar").collect(toSet()),
             (string1, string2) -> string1 + string2
         );
 
-        assertThat(stringAppendingMagma.append("foo", "bar")).isEqualTo("foobar");
+        assertThatThrownBy(() -> stringAppendingMagma.append("foo", "bar"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("The result of the applied binary operation is not an element of this magma");
     }
 
     @Test
-    void append_shouldAppend_2() {
+    void shouldAppend_1() {
+        Magma<String> singletonStringAppendingMagma = new Magma<>(
+            singleton("foo"),
+            (string1, string2) -> string1
+        );
+
+        assertThat(singletonStringAppendingMagma.append("foo", "foo")).isEqualTo("foo");
+    }
+
+    @Test
+    void shouldAppend_2() {
+        Magma<String> singletonStringAppendingMagma = new Magma<>(
+            new HashSet<>(asList("foo", "bar", "foobar")),
+            (string1, string2) -> string1 + string2
+        );
+
+        assertThat(singletonStringAppendingMagma.append("foo", "bar")).isEqualTo("foobar");
+    }
+
+    @Test
+    void shouldAppend_3() {
         Magma<Integer> numberAppendingMagma = new Magma<>(
             new HashSet<>(asList(1, 2, 3, 4, 5, 6, 7, 8, 9)),
             Integer::sum
         );
 
-        assertThat(numberAppendingMagma.append(8, 9)).isEqualTo(17);
+        assertThat(numberAppendingMagma.append(2, 5)).isEqualTo(7);
     }
 
     @Test
-    void append_shouldAppend_3() {
-        Payment payment1 = new Payment()
-            .cardNumber("1234 1234")
-            .cardHolderName("JOHN JAMES")
-            .expirationDate(LocalDate.of(2022, 11, 1))
-            .cvc(123);
-
-        Payment payment2 = new Payment()
-            .cardNumber("1234 1234")
-            .cardHolderName("JOHN JAMES SR.")
-            .amount(12.45);
-
-        Magma<Payment> paymentAppendingMagma = new Magma<>(
-            new HashSet<>(asList(payment1, payment2)),
-            Payment::append
+    void shouldAppend_4() {
+        Magma<Integer> numberAppendingMagma = new Magma<>(
+            new HashSet<>(asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
+            (hour1, hour2) -> ((hour1 + hour2) % 12 == 0)
+                ? 12
+                : (hour1 + hour2) % 12
         );
-
-        Payment mergedPayment = paymentAppendingMagma.append(payment1, payment2);
-        assertThat(mergedPayment.cardNumber).isEqualTo("1234 1234");
-        assertThat(mergedPayment.cardHolderName).isEqualTo("JOHN JAMES");
-        assertThat(mergedPayment.expirationDate).isEqualTo(LocalDate.of(2022, 11, 1));
-        assertThat(mergedPayment.cvc).isEqualTo(123);
-        assertThat(mergedPayment.amount).isEqualTo(12.45);
-        assertThat(mergedPayment.isPaymentReceived).isFalse();
+        assertThat(numberAppendingMagma.append(2, 5)).isEqualTo(7);
+        assertThat(numberAppendingMagma.append(2, 10)).isEqualTo(12);
+        assertThat(numberAppendingMagma.append(2, 12)).isEqualTo(2);
+        assertThat(numberAppendingMagma.append(8, 11)).isEqualTo(7);
     }
 }

@@ -3,6 +3,7 @@
 
 # Ignore IDE/tools stuff
 .idea
+.vercel
 
 # Ignore logs
 
