@@ -1,9 +1,13 @@
 package land.plainfunctional.algebraicstructure;
 
 import java.util.HashSet;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+
+import land.plainfunctional.testdomain.vanillaecommerce.Address;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
@@ -92,26 +96,16 @@ class MagmaSpecs {
 
     @Test
     void shouldAppend_1() {
-        Magma<String> singletonStringAppendingMagma = new Magma<>(
-            singleton("foo"),
-            (string1, string2) -> string1
-        );
-
-        assertThat(singletonStringAppendingMagma.append("foo", "foo")).isEqualTo("foo");
-    }
-
-    @Test
-    void shouldAppend_2() {
-        Magma<String> singletonStringAppendingMagma = new Magma<>(
+        Magma<String> stringAppendingMagma = new Magma<>(
             new HashSet<>(asList("foo", "bar", "foobar")),
             (string1, string2) -> string1 + string2
         );
 
-        assertThat(singletonStringAppendingMagma.append("foo", "bar")).isEqualTo("foobar");
+        assertThat(stringAppendingMagma.append("foo", "bar")).isEqualTo("foobar");
     }
 
     @Test
-    void shouldAppend_3() {
+    void shouldAppend_2() {
         Magma<Integer> numberAppendingMagma = new Magma<>(
             new HashSet<>(asList(1, 2, 3, 4, 5, 6, 7, 8, 9)),
             Integer::sum
@@ -121,7 +115,7 @@ class MagmaSpecs {
     }
 
     @Test
-    void shouldAppend_4() {
+    void shouldAppend_3() {
         Magma<Integer> numberAppendingMagma = new Magma<>(
             new HashSet<>(asList(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)),
             (hour1, hour2) -> ((hour1 + hour2) % 12 == 0)
@@ -132,5 +126,53 @@ class MagmaSpecs {
         assertThat(numberAppendingMagma.append(2, 10)).isEqualTo(12);
         assertThat(numberAppendingMagma.append(2, 12)).isEqualTo(2);
         assertThat(numberAppendingMagma.append(8, 11)).isEqualTo(7);
+    }
+
+    @Test
+    void shouldAppend_4() {
+        Address address1 = new Address("The street 1", "1234");
+        Address address2 = new Address("The street 2", "1234");
+        Address address3 = new Address("The street 1", "1234", "The valley", null);
+
+        Set<Address> set = new HashSet<>();
+        set.add(address1);
+        set.add(address2);
+        set.add(address3);
+
+        Magma<Address> singletonStringAppendingMagma = new Magma<>(
+            set,
+            Address::append
+        );
+
+        assertThat(singletonStringAppendingMagma.append(address1, address3)).isEqualTo(
+            address1.postalLocation("The valley")
+        );
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Set semantics
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Test
+    void shouldRemoveIdenticalElements() {
+        Semigroup<String> singletonStringAppendingSemigroup = new Semigroup<>(
+            new TreeSet<>(asList("foo", "bar", "foo", "bar", "foobar")),
+            (string1, string2) -> string1 + string2
+        );
+
+        assertThat(singletonStringAppendingSemigroup.set.size()).isEqualTo(3);
+    }
+
+    @Test
+    void whenEqualElements_shouldThrowException() {
+        Magma<String> singletonStringAppendingMagma = new Magma<>(
+            new TreeSet<>(asList("foo", "foofoo")),
+            (string1, string2) -> string1 + string2
+        );
+
+        assertThatThrownBy(() -> singletonStringAppendingMagma.append("foo", "foo"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("Cannot append two equal element values in a magma");
     }
 }

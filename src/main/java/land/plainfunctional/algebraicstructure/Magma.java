@@ -20,13 +20,15 @@ import land.plainfunctional.util.Arguments;
  *
  * <p>
  * Functions whose domain is equal to its codomain, are known as <i>endofunctions</i>.
- * (A homomorphic endofunction is an <i>endomorphism</i>, and is the usually the case).
+ * (A homomorphic endofunction is an <i>endomorphism</i>, and is the usually the case.)
  * </p>
  *
  * <p>
  * The magma operation can be regarded as <i>addition</i>,
  * and could have been named <code>add</code> (or <code>merge</code>).
  * <code>append</code> is chosen because it is the more generic term.
+ * When regarding <i>types as sets of values</i>,
+ * a magma is like a user-defined subtype with a way to add values of that type together.
  * </p>
  *
  * @param <T> The magma type
@@ -50,7 +52,7 @@ public class Magma<T> {
      * <p>
      * The totality/closure property which the binary operation also must inhibit,
      * is enforced via the single-parametric {@link BinaryOperator} class,
-     * in addition to internal constraints defined in the <code>append</code> method.
+     * in addition to constraints defined in the <code>append</code> method.
      * </p>
      */
     protected final BinaryOperator<T> closedBinaryOperation;
@@ -63,7 +65,7 @@ public class Magma<T> {
     }
 
     /**
-     * Application of this magma's operation, a constrained <i>endofunction</i>.
+     * Application of this magma's operation, an <i>endofunction</i>.
      *
      * <p>
      * <i>
@@ -75,13 +77,17 @@ public class Magma<T> {
      *
      * @param element1 a magma element
      * @param element2 a magma element
-     * @return a resulting magma element, or a bottom value if the result is not an element of the magma
+     * @return a resulting magma element, or a bottom value if the result is not an element of this magma
      * @throws IllegalArgumentException if one or both of the arguments are not elements of this magma
      * @throws IllegalStateException    if the result of the applied operation is not element of this magma
      */
     public T append(T element1, T element2) {
         Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");
         Arguments.requireNotNull(element2, "'element2' argument cannot be 'null'");
+
+        if (element1.equals(element2)) {
+            throw new IllegalArgumentException("Cannot append two equal element values in a magma");
+        }
 
         if (this.set.parallelStream().noneMatch(element1::equals)) {
             throw new IllegalArgumentException("'element1' argument is not an element of this magma");
