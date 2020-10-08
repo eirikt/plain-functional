@@ -1,7 +1,5 @@
 package land.plainfunctional.algebraicstructure;
 
-import java.util.Comparator;
-import java.util.Objects;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.function.BinaryOperator;
@@ -13,55 +11,55 @@ import land.plainfunctional.testdomain.vanillaecommerce.Address;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySortedSet;
 import static java.util.Collections.singletonList;
+import static land.plainfunctional.algebraicstructure.FreeSemigroupSpecs.orderedByInsertTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class FreeSemigroupSpecs {
-
-    //public static <T> SortedSet<T> singletonSortedSet(T singleElement) {
-    //    //SortedSet<T> singletonSortedSet = new TreeSet<>((o1, o2) -> 0);
-    //    //singletonSortedSet.add(singleElement);
-    //    //return singletonSortedSet;
-    //    return new TreeSet<>(singletonList(singleElement));
-    //}
-
-    public static <T> Comparator<T> chronologicalComparator() {
-        return (element1, element2) -> {
-            // No, no
-            //if (element1 instanceof Comparable<?> && element2 instanceof Comparable<?>) {
-            //    return ((Comparable<T>) element1).compareTo(element2);
-            //}
-            return Objects.equals(element1, element2)
-                ? 0
-                // By default: 'element1' is greater than 'element2'
-                : 1;
-        };
-    }
-
-    public static <T> Comparator<T> orderedByInsertTime() {
-        return chronologicalComparator();
-    }
-
+class MonoidSpecs {
 
     ///////////////////////////////////////////////////////////////////////////
     // Construction
     ///////////////////////////////////////////////////////////////////////////
 
     void emptyConstructor_shouldNotCompile() {
-        //Semigroup<String> magma = new FreeSemigroup<>();
+        //Monoid<String> magma = new Monoid<>();
     }
 
     void unaryConstructor_shouldNotCompile() {
-        //Semigroup<String> magma = new FreeSemigroup<>(null);
+        //Monoid<String> magma = new Monoid<>(null);
+    }
+
+    void binaryConstructor_shouldNotCompile() {
+        //FreeMonoid<String> magma = new FreeMonoid<>(null, null);
     }
 
     @Test
     void binaryConstructor_whenNullArgs_shouldThrowException() {
-        assertThatThrownBy(() -> new FreeSemigroup<>((SortedSet<?>) null, null))
+        assertThatThrownBy(() -> new Monoid<>(
+            (SortedSet<?>) null,
+            null,
+            null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("A magma must have a set of values");
 
-        assertThatThrownBy(() -> new FreeSemigroup<String>(emptySortedSet(), null))
+        assertThatThrownBy(() -> new Monoid<String>(
+            emptySortedSet(),
+            null,
+            null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("A magma must have a closed binary operation");
+
+        assertThatThrownBy(() -> new Monoid<>(
+            emptySortedSet(),
+            (BinaryOperator<String>) (s, s2) -> null,
+            null))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("A monoid must have an identity element - a neutral element");
+
+        assertThatThrownBy(() -> new Monoid<String>(
+            emptySortedSet(),
+            null,
+            ""))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("A magma must have a closed binary operation");
     }
@@ -73,32 +71,81 @@ class FreeSemigroupSpecs {
 
     @Test
     void whenNullArgs_shouldThrowException() {
-        FreeSemigroup<String> emptyStringAppendingSemigroup = new FreeSemigroup<>(
+        Monoid<String> emptyStringAppendingMonoid = new Monoid<>(
             emptySortedSet(),
-            (string1, string2) -> string1 + string2
+            (string1, string2) -> string1 + string2,
+            ""
         );
 
-        assertThatThrownBy(() -> emptyStringAppendingSemigroup.append(null, null))
+        assertThatThrownBy(() -> emptyStringAppendingMonoid.append(null, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("'element1' argument cannot be 'null'");
 
-        assertThatThrownBy(() -> emptyStringAppendingSemigroup.append("foo", null))
+        assertThatThrownBy(() -> emptyStringAppendingMonoid.append("foo", null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("'element2' argument cannot be 'null'");
 
-        assertThatThrownBy(() -> emptyStringAppendingSemigroup.append(null, "foo"))
+        assertThatThrownBy(() -> emptyStringAppendingMonoid.append(null, "foo"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("'element1' argument cannot be 'null'");
     }
 
     @Test
-    void shouldAppend_1() {
-        FreeSemigroup<String> stringAppendingSemigroup = new FreeSemigroup<>(
-            new TreeSet<>(asList("foo", "bar", "foobar")),
-            (string1, string2) -> string1 + string2
+    void whenUnknownArgs_shouldThrowException_1() {
+        Monoid<String> stringAppendingMonoid = new Monoid<>(
+            emptySortedSet(),
+            (string1, string2) -> string1 + string2,
+            ""
         );
 
-        assertThat(stringAppendingSemigroup.append("foo", "bar")).isEqualTo("foobar");
+        assertThatThrownBy(() -> stringAppendingMonoid.append("foo", "bar"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("'element1' argument is not an element of this magma");
+
+        assertThatThrownBy(() -> stringAppendingMonoid.append("bar", "foo"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("'element1' argument is not an element of this magma");
+    }
+
+    @Test
+    void whenUnknownArgs_shouldThrowException_2() {
+        Monoid<String> stringAppendingMonoid = new Monoid<>(
+            new TreeSet<>(singletonList("foo")),
+            (string1, string2) -> string1 + string2,
+            ""
+        );
+
+        assertThatThrownBy(() -> stringAppendingMonoid.append("foo", "bar"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("'element2' argument is not an element of this magma");
+
+        assertThatThrownBy(() -> stringAppendingMonoid.append("bar", "foo"))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("'element1' argument is not an element of this magma");
+    }
+
+    @Test
+    void whenUnknownResult_shouldThrowException() {
+        Monoid<String> stringAppendingMonoid = new Monoid<>(
+            new TreeSet<>(asList("foo", "bar")),
+            (string1, string2) -> string1 + string2,
+            ""
+        );
+
+        assertThatThrownBy(() -> stringAppendingMonoid.append("foo", "bar"))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessage("The result of the applied binary operation is not an element of this magma");
+    }
+
+    @Test
+    void shouldAppend_1() {
+        Monoid<String> stringAppendingMonoid = new Monoid<>(
+            new TreeSet<>(asList("foo", "bar", "foobar")),
+            (string1, string2) -> string1 + string2,
+            ""
+        );
+
+        assertThat(stringAppendingMonoid.append("foo", "bar")).isEqualTo("foobar");
     }
 
     @Test
@@ -112,38 +159,40 @@ class FreeSemigroupSpecs {
         chronologicallyEnumeratedSet.add(address2);
         chronologicallyEnumeratedSet.add(address3);
 
-        FreeSemigroup<Address> addressAppendingSemigroup = new FreeSemigroup<>(
+        Monoid<Address> addressAppendingMonoid = new Monoid<>(
             chronologicallyEnumeratedSet,
-            Address::append
+            Address::append,
+            Address.IDENTITY
         );
 
-        assertThat(addressAppendingSemigroup.append(address1, address3)).isEqualTo(
+        assertThat(addressAppendingMonoid.append(address1, address3)).isEqualTo(
             address1.postalLocation("The valley")
         );
 
-        assertThat(addressAppendingSemigroup.append(address3, address1)).isEqualTo(
+        assertThat(addressAppendingMonoid.append(address3, address1)).isEqualTo(
             address1.postalLocation("The valley")
         );
     }
 
-    //@Test No, this is not a FreeSemigroup requirement - associativity only kicks in when combining more than 2 elements
+    //@Test No, this is not a monoid requirement - associativity only kicks in when combining more than 2 elements
     void whenViolatesDefinedEnumeration_shouldThrowException_1() {
         SortedSet<String> chronologicallyEnumeratedSet = new TreeSet<>(orderedByInsertTime());
         chronologicallyEnumeratedSet.add("foo");
         chronologicallyEnumeratedSet.add("bar");
         chronologicallyEnumeratedSet.add("barfoo");
 
-        FreeSemigroup<String> stringAppendingSemigroup = new FreeSemigroup<>(
+        Monoid<String> stringAppendingMonoid = new Monoid<>(
             chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2
+            (string1, string2) -> string1 + string2,
+            ""
         );
 
-        assertThatThrownBy(() -> stringAppendingSemigroup.append("bar", "foo"))
+        assertThatThrownBy(() -> stringAppendingMonoid.append("bar", "foo"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Illegal associative relation between the given elements in the FreeSemigroup");
+            .hasMessage("Illegal associative relation between the given elements in the Monoid");
     }
 
-    //@Test No, this is not a semigroup requirement - associativity only kicks in when combining more than 2 elements
+    //@Test No, this is not a monoid requirement - associativity only kicks in when combining more than 2 elements
     void whenViolatesDefinedEnumeration_shouldThrowException_2() {
         Address address1 = new Address("The street 1", "1234");
         Address address2 = new Address("The street 2", "1234");
@@ -154,14 +203,15 @@ class FreeSemigroupSpecs {
         chronologicallyEnumeratedSet.add(address2);
         chronologicallyEnumeratedSet.add(address3);
 
-        FreeSemigroup<Address> stringAppendingSemigroup = new FreeSemigroup<>(
+        Monoid<Address> stringAppendingMonoid = new Monoid<>(
             chronologicallyEnumeratedSet,
-            Address::append
+            Address::append,
+            Address.IDENTITY
         );
 
-        assertThatThrownBy(() -> stringAppendingSemigroup.append(address3, address1))
+        assertThatThrownBy(() -> stringAppendingMonoid.append(address3, address1))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Illegal associative relation between the given elements in the semigroup");
+            .hasMessage("Illegal associative relation between the given elements in the Monoid");
     }
 
     @Test
@@ -169,12 +219,13 @@ class FreeSemigroupSpecs {
         SortedSet<Integer> chronologicallyEnumeratedSet = new TreeSet<>(orderedByInsertTime());
         chronologicallyEnumeratedSet.addAll(asList(7, 6, 5, 4, 3, 2, 1));
 
-        FreeSemigroup<Integer> numberAppendingSemigroup = new FreeSemigroup<>(
+        Monoid<Integer> numberAppendingMonoid = new Monoid<>(
             chronologicallyEnumeratedSet,
-            Integer::sum
+            Integer::sum,
+            0
         );
 
-        assertThat(numberAppendingSemigroup.append(2, 5)).isEqualTo(7);
+        assertThat(numberAppendingMonoid.append(2, 5)).isEqualTo(7);
     }
 
     @Test
@@ -186,12 +237,16 @@ class FreeSemigroupSpecs {
 
         SortedSet<Integer> set = new TreeSet<>(asList(1, 3, 5, 7, 9, 11, 2, 4, 6, 8, 10, 12));
 
-        FreeSemigroup<Integer> clockHourAppendingSemigroup = new FreeSemigroup<>(set, clockHourAdd);
+        Monoid<Integer> clockHourAppendingMonoid = new Monoid<>(
+            set,
+            clockHourAdd,
+            0
+        );
 
-        assertThat(clockHourAppendingSemigroup.append(2, 5)).isEqualTo(7);
-        assertThat(clockHourAppendingSemigroup.append(2, 10)).isEqualTo(12);
-        assertThat(clockHourAppendingSemigroup.append(2, 12)).isEqualTo(2);
-        assertThat(clockHourAppendingSemigroup.append(8, 11)).isEqualTo(7);
+        assertThat(clockHourAppendingMonoid.append(2, 5)).isEqualTo(7);
+        assertThat(clockHourAppendingMonoid.append(2, 10)).isEqualTo(12);
+        assertThat(clockHourAppendingMonoid.append(2, 12)).isEqualTo(2);
+        assertThat(clockHourAppendingMonoid.append(8, 11)).isEqualTo(7);
     }
 
 
@@ -213,13 +268,14 @@ class FreeSemigroupSpecs {
         chronologicallyEnumeratedSet.add(" ");
         chronologicallyEnumeratedSet.add(" ");
 
-        FreeSemigroup<String> helloWorldGeneratingSemigroup = new FreeSemigroup<>(
+        Monoid<String> helloWorldGeneratingMonoid = new Monoid<>(
             chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2
+            (string1, string2) -> string1 + string2,
+            ""
         );
 
         String identityValue = "";
-        String reducedString = helloWorldGeneratingSemigroup.set
+        String reducedString = helloWorldGeneratingMonoid.set
             .parallelStream()
             .reduce(
                 identityValue,
@@ -236,13 +292,14 @@ class FreeSemigroupSpecs {
         chronologicallyEnumeratedSet.add(" ");
         chronologicallyEnumeratedSet.add("!");
 
-        FreeSemigroup<String> helloWorldGeneratingSemigroup = new FreeSemigroup<>(
+        Monoid<String> helloWorldGeneratingMonoid = new Monoid<>(
             chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2
+            (string1, string2) -> string1 + string2,
+            ""
         );
 
         String identityValue = "";
-        String reducedString = helloWorldGeneratingSemigroup.set
+        String reducedString = helloWorldGeneratingMonoid.set
             .parallelStream()
             .reduce(
                 identityValue,
@@ -250,37 +307,4 @@ class FreeSemigroupSpecs {
             );
         assertThat(reducedString).isEqualTo("worldHello !");
     }
-
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Fold / catamorphism
-    ///////////////////////////////////////////////////////////////////////////
-
-    /*
-    @Test
-    void shouldFold() {
-        String identityValue = "";
-
-        SortedSet<String> chronologicallyEnumeratedSet = new TreeSet<>(orderedByInsertTime());
-        chronologicallyEnumeratedSet.add(identityValue);
-        chronologicallyEnumeratedSet.add("Hello world!");
-        chronologicallyEnumeratedSet.add("Hello");
-        chronologicallyEnumeratedSet.add(" ");
-        chronologicallyEnumeratedSet.add("Hello");
-        chronologicallyEnumeratedSet.add("world");
-        chronologicallyEnumeratedSet.add("!");
-        chronologicallyEnumeratedSet.add(" ");
-        chronologicallyEnumeratedSet.add("!");
-        chronologicallyEnumeratedSet.add("world");
-        chronologicallyEnumeratedSet.add("!");
-        chronologicallyEnumeratedSet.add(" ");
-
-        FreeSemigroup<String> helloWorldGeneratingSemigroup = new FreeSemigroup<>(
-            chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2
-        );
-
-        assertThat(helloWorldGeneratingSemigroup.toMonoid(identityValue).fold()).isEqualTo("Hello world!");
-    }
-    */
 }

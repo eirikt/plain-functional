@@ -31,7 +31,7 @@ import land.plainfunctional.util.Arguments;
  * a magma is like a user-defined subtype with a way to add values of that type together.
  * </p>
  *
- * @param <T> The magma type
+ * @param <T> The magma type, all elements in this magma belongs to this type
  * @see <a href="https://en.wikipedia.org/wiki/Algebraic_structure">Algebraic structure (Wikipedia)</a>
  * @see <a href="https://en.wikipedia.org/wiki/Set_(mathematics)">Set (Wikipedia)</a>
  * @see <a href="https://en.wikipedia.org/wiki/Magma_(algebra)">Magma (Wikipedia)</a>
@@ -55,17 +55,22 @@ public class Magma<T> {
      * in addition to constraints defined in the <code>append</code> method.
      * </p>
      */
-    protected final BinaryOperator<T> closedBinaryOperation;
+    protected final BinaryOperator<T> binaryOperation;
 
-    public Magma(Set<T> set, BinaryOperator<T> closedBinaryOperation) {
+    /**
+     * @param set             set of elements
+     * @param binaryOperation closed binary operation
+     */
+    public Magma(Set<T> set, BinaryOperator<T> binaryOperation) {
         Arguments.requireNotNull(set, "A magma must have a set of values");
-        Arguments.requireNotNull(closedBinaryOperation, "A magma must have a closed binary operation");
+        Arguments.requireNotNull(binaryOperation, "A magma must have a closed binary operation");
         this.set = set;
-        this.closedBinaryOperation = closedBinaryOperation;
+        this.binaryOperation = binaryOperation;
     }
 
     /**
-     * Application of this magma's operation, an <i>endofunction</i>.
+     * Application of this magma's operation •<br>
+     * This is an <i>endofunction</i>/<i>endomorphism</i>.
      *
      * <p>
      * <i>
@@ -96,7 +101,7 @@ public class Magma<T> {
             throw new IllegalArgumentException("'element2' argument is not an element of this magma");
         }
 
-        T result = this.closedBinaryOperation.apply(element1, element2);
+        T result = this.binaryOperation.apply(element1, element2);
 
         if (this.set.parallelStream().noneMatch(result::equals)) {
             throw new IllegalStateException("The result of the applied binary operation is not an element of this magma");

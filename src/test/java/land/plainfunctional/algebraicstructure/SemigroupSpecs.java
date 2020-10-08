@@ -57,7 +57,7 @@ class SemigroupSpecs {
 
     @Test
     void binaryConstructor_whenNullArgs_shouldThrowException() {
-        assertThatThrownBy(() -> new Semigroup<>(null, null))
+        assertThatThrownBy(() -> new Semigroup<>((SortedSet<?>) null, null))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("A magma must have a set of values");
 

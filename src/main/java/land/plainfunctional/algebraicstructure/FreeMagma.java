@@ -33,17 +33,26 @@ import static java.util.Collections.emptySet;
  * I think the use of it here is mostly viable... hope so.
  * </p>
  *
- * @param <T> The magma type
+ * @param <T> The magma type, all values of this type belongs to the magma
  * @see <a href="https://en.wikipedia.org/wiki/Magma_(algebra)#Free_magma">Free magma (Wikipedia)</a>
  */
 public class FreeMagma<T> extends Magma<T> {
 
-    public FreeMagma(BinaryOperator<T> closedBinaryOperation) {
-        this(emptySet(), closedBinaryOperation);
+    /**
+     * Create an empty free magma.
+     *
+     * @param binaryOperation closed binary operation
+     */
+    public FreeMagma(BinaryOperator<T> binaryOperation) {
+        this(emptySet(), binaryOperation);
     }
 
-    public FreeMagma(Set<T> set, BinaryOperator<T> closedBinaryOperation) {
-        super(set, closedBinaryOperation);
+    /**
+     * @param set             set of elements
+     * @param binaryOperation closed binary operation
+     */
+    public FreeMagma(Set<T> set, BinaryOperator<T> binaryOperation) {
+        super(set, binaryOperation);
     }
 
     /**
@@ -67,6 +76,6 @@ public class FreeMagma<T> extends Magma<T> {
             throw new IllegalArgumentException("Cannot append two equal element values in a magma");
         }
 
-        return this.closedBinaryOperation.apply(element1, element2);
+        return this.binaryOperation.apply(element1, element2);
     }
 }

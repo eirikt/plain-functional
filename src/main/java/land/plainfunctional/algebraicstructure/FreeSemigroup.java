@@ -1,5 +1,6 @@
 package land.plainfunctional.algebraicstructure;
 
+import java.util.LinkedHashSet;
 import java.util.SortedSet;
 import java.util.function.BinaryOperator;
 
@@ -31,16 +32,31 @@ import land.plainfunctional.util.Arguments;
  * I think the use of it here is mostly viable... hope so.
  * </p>
  *
- * @param <T> The magma type
+ * @param <T> The semigroup type, all values of this type belongs to the semigroup
  * @see <a href="https://en.wikipedia.org/wiki/Free_monoid">Free semigroup (Wikipedia)</a>
  */
 public class FreeSemigroup<T> extends Semigroup<T> {
 
+    /**
+     * @param linkedHashSet   set of elements which preserves its element insertion order when iterated
+     * @param binaryOperation associative and closed binary operation
+     */
     public FreeSemigroup(
-        SortedSet<T> set,
-        BinaryOperator<T> associativeAndClosedBinaryOperation
+        LinkedHashSet<T> linkedHashSet,
+        BinaryOperator<T> binaryOperation
     ) {
-        super(set, associativeAndClosedBinaryOperation);
+        super(linkedHashSet, binaryOperation);
+    }
+
+    /**
+     * @param sortedSet       set of elements which iteration order is defined by its 'Comparator' member
+     * @param binaryOperation associative and closed binary operation
+     */
+    public FreeSemigroup(
+        SortedSet<T> sortedSet,
+        BinaryOperator<T> binaryOperation
+    ) {
+        super(sortedSet, binaryOperation);
     }
 
     /**
@@ -52,7 +68,7 @@ public class FreeSemigroup<T> extends Semigroup<T> {
      *
      * @param element1 a semigroup element
      * @param element2 a semigroup element
-     * @return a new value
+     * @return a resulting semigroup element, or a bottom value if the result is not an element of this magma
      * @throws IllegalArgumentException if the element values are equal
      */
     @Override
@@ -64,18 +80,16 @@ public class FreeSemigroup<T> extends Semigroup<T> {
             throw new IllegalArgumentException("Cannot append two equal element values in a magma");
         }
 
-        return this.closedBinaryOperation.apply(element1, element2);
+        return this.binaryOperation.apply(element1, element2);
     }
 
     /**
-     * @deprecated This method will be renamed to 'toMonoid'
+     * By providing a identity element, this semigroup may be promoted to a {@link FreeMonoid} instance.
+     *
+     * @param identityElement the monoid's identity element
+     * @return a new 'FreeMonoid' instance
      */
-    @Deprecated // This method will be renamed to 'toMonoid'
-    public T leftFold(T identityValue) {
-        T foldedValue = identityValue;
-        for (T element : this.set) {
-            foldedValue = append(foldedValue, element);
-        }
-        return foldedValue;
+    public FreeMonoid<T> toFreeMonoid(T identityElement) {
+        return new FreeMonoid<>((SortedSet<T>) this.set, this.binaryOperation, identityElement);
     }
 }

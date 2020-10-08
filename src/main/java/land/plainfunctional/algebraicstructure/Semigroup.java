@@ -1,10 +1,12 @@
 package land.plainfunctional.algebraicstructure;
 
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.SortedSet;
 import java.util.function.BinaryOperator;
 
 /**
- * A semigroup is an <i>associative</i> magma.
+ * A <b>semigroup</b> is an <i>associative magma</i>.
  *
  * <p>
  * <i>Formally:</i> To qualify as a semigroup, the set 𝕊 and the binary operation • must be associative:<br>
@@ -14,20 +16,47 @@ import java.util.function.BinaryOperator;
  * <p>
  * Associativity means that all (applications of the binary) operations may be applied in whatever order,
  * as long as the order of the values do not change.
- * This requirement is enforced by the {@link SortedSet} constructor argument,
- * enumerating the semigroup elements via a the {@link SortedSet}'s mandatory {@link Comparable} member instance,
- * that may be set via one of the {@link SortedSet}'s constructors.
+ * This requirement is enforced by the {@link LinkedHashSet} constructor argument,
+ * which preserves the insertion order when it is iterated.
+ * For other ordering schemes, the requirement is enforced by the {@link SortedSet} constructor argument,
+ * enumerating the semigroup elements via a the {@link SortedSet}'s mandatory {@link Comparator} member instance,
+ * which may be set via one of the {@link SortedSet}'s constructors.
  * </p>
  *
- * @param <T> The semigroup type
+ * @param <T> The semigroup type, all elements in this semigroup belongs to this type
  * @see <a href="https://en.wikipedia.org/wiki/Semigroup">Semigroup (Wikipedia)</a>
  */
 public class Semigroup<T> extends Magma<T> {
 
+    /**
+     * @param linkedHashSet   set of elements which preserves its element insertion order when iterated
+     * @param binaryOperation associative and closed binary operation
+     */
     public Semigroup(
-        SortedSet<T> set,
-        BinaryOperator<T> associativeAndClosedBinaryOperation
+        LinkedHashSet<T> linkedHashSet,
+        BinaryOperator<T> binaryOperation
     ) {
-        super(set, associativeAndClosedBinaryOperation);
+        super(linkedHashSet, binaryOperation);
+    }
+
+    /**
+     * @param sortedSet       set of elements which iteration order is defined by its 'Comparator' member
+     * @param binaryOperation associative and closed binary operation
+     */
+    public Semigroup(
+        SortedSet<T> sortedSet,
+        BinaryOperator<T> binaryOperation
+    ) {
+        super(sortedSet, binaryOperation);
+    }
+
+    /**
+     * By providing a identity element, this semigroup may be promoted to a {@link Monoid} instance.
+     *
+     * @param identityElement the monoid's identity element
+     * @return a new 'Monoid' instance
+     */
+    public Monoid<T> toMonoid(T identityElement) {
+        return new Monoid<>((SortedSet<T>) this.set, this.binaryOperation, identityElement);
     }
 }
