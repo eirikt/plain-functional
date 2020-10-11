@@ -2,12 +2,11 @@ package land.plainfunctional.testdomain.vanillaecommerce;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 import land.plainfunctional.util.Arguments;
 
-import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 public class Address {
@@ -32,6 +31,7 @@ public class Address {
 
     public Address(String streetLine, String postalCode, String postalLocation, String country) {
         Arguments.requireNotBlank(streetLine, "streetLine' argument cannot be blank");
+        Arguments.requireNotBlank(postalCode, "postalCode' argument cannot be blank");
         this.streetLine = streetLine;
         this.postalCode = postalCode;
         this.postalLocation = postalLocation;
@@ -39,7 +39,8 @@ public class Address {
     }
 
     /**
-     * Algebraic append, strategy: If the property is missing, add the property of the other ("secondary") address.
+     * Algebraic append<br>
+     * <i>Strategy: If the property is missing, add the property of the other ("secondary") address.</i>
      *
      * <p>
      * This binary operation forms a monoid together with this class' 'identity' function (and an enumerated set of {@link Address}.
@@ -91,35 +92,13 @@ public class Address {
 
     @Override
     public String toString() {
-        return ToStringBuilder
-            .reflectionToString(
-                this,
-                ToStringStyle.SIMPLE_STYLE,
-                true
-            );
-    }
-
-    /**
-     * Equal to <code>toString</code>, except for Java object references, which are omitted.
-     */
-    public String toValueString() {
-        return format(
-            "%s[streetLine=%s, postalCode=%s, postalLocation=%s, country=%s]",
-            this.getClass().getName(),
-            this.streetLine,
-            this.postalCode,
-            this.postalLocation == null ? "[unknown]" : this.postalLocation,
-            this.postalLocation == null ? "[unknown]" : this.postalLocation
-        );
-    }
-
-    /**
-     * Partial <code>toString</code>. Java object references are omitted.
-     */
-    public String toShortValueString() {
-        return format(
-            "%s, %s %s",
-            this.streetLine, this.postalCode, this.postalLocation == null ? "" : this.postalLocation
+        return ReflectionToStringBuilder.toString(
+            this,
+            ToStringStyle.SHORT_PREFIX_STYLE,
+            true,
+            false,
+            true,
+            Object.class
         );
     }
 }

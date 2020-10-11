@@ -6,6 +6,7 @@ import java.time.YearMonth;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 import static java.lang.Integer.parseInt;
@@ -145,12 +146,15 @@ public class Payment {
 
 
     /**
-     * Algebraic append, strategy: ...
+     * Algebraic append<br>
+     * <i>Strategy: Update state with properties from 'Payment' parameter if not already set</i>
      *
-     * This binary operation forms a monoid together with this class' 'identity' function (and an enumerated set of {@link Payment}.
+     * <p>
+     * This binary operation forms a monoid together with this class' 'identity' function (and an enumerated set of {@link Payment} objects).
+     * </p>
      *
      * @param payment The "secondary" payment
-     * @return the merged payment
+     * @return the merged/appended/amended payment
      */
     public Payment append(Payment payment) {
         return new Payment(
@@ -198,23 +202,27 @@ public class Payment {
 
     @Override
     public String toString() {
-        return reflectionToString(
-            this, ToStringStyle.SHORT_PREFIX_STYLE, true
+        return ReflectionToStringBuilder.toString(
+            this,
+            ToStringStyle.SHORT_PREFIX_STYLE,
+            true,
+            false,
+            true,
+            Object.class
         );
     }
 
     /**
-     * Equal to <code>toString</code>, except for Java object references, which are omitted.
-     * Also, <i>transient</i> fields are not included in String representations of these objects.
+     * Equal to <code>toString</code>, except for <i>transient</i> fields which are omitted.
      */
-    public String toStringNoTransient() {
-        //return format(
-        //    "%s[amount=%s, isPaymentReceived=%s]",
-        //    this.getClass().getName(),
-        //    this.amount, this.isPaymentReceived
-        //);
-        return reflectionToString(
-            this, ToStringStyle.SHORT_PREFIX_STYLE
+    public String toStringNoTransients() {
+        return ReflectionToStringBuilder.toString(
+            this,
+            ToStringStyle.SHORT_PREFIX_STYLE,
+            false,
+            false,
+            true,
+            Object.class
         );
     }
 }
