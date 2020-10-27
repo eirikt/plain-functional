@@ -85,6 +85,14 @@ class EitherSpecs {
 
         assertThat(right).isNotSameAs(right(now()));
         assertThat(right).isEqualTo(right(now()));
+
+        // Bonus: Functor behaviour
+        Either<String, LocalDate> mapped = right.map((string) -> LocalDate.now());
+        assertThat(mapped.isLeft()).isFalse();
+
+        // Bonus: Monad behaviour
+        Either<String, LocalDate> next = right.bind((string) -> right(now()));
+        assertThat(next.isLeft()).isFalse();
     }
 
     @Test

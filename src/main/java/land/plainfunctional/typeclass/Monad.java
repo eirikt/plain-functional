@@ -1,6 +1,7 @@
 package land.plainfunctional.typeclass;
 
 import java.util.function.Function;
+import land.plainfunctional.util.Arguments;
 
 /**
  * <p>
@@ -57,9 +58,19 @@ public interface Monad<T> extends Applicative<T> {
     /**
      * Alias of <code>bind</code>.
      */
-    default <V, M extends Monad<V>> M then(Function<? super T, M> function) {
+    default <V> Monad<V> then(Function<? super T, ? extends Monad<V>> function) {
         return bind(function);
     }
+
+    // TODO: Keep until a couple of more monads have been created...
+    //@param <M>      Covariant type of the new monad
+    //@param <M>      Covariant type of a function in a (monad) context
+    //@throws ClassCastException If the type <code>M</code> of the new monad is not the same type as the calling monad
+    //@Deprecated default <V, M extends Monad<V>> M OLD_bind(Function<? super T, M> function) {
+    //Monad<V> mapped = (Monad<V>) map(function);
+    //M mappedThenFlattened = (M) mapped.join();
+    //return mappedThenFlattened;
+    //}
 
     /**
      * The monad function.
@@ -91,16 +102,16 @@ public interface Monad<T> extends Applicative<T> {
      * </p>
      *
      * @param function The monad action
-     * @param <V>      The type of the codomain
-     * @param <M>      Covariant type of the new monad
+     * @param <V>      The type of the codomain, hence the new value context, or just, the new functor type
+     * @param <M>      Monad-covariant type (of the new monad)
      * @return the new monad
      */
     default <V, M extends Monad<V>> M bind(Function<? super T, M> function) {
-        Monad<V> mapped = (Monad<V>) map(function);
+        Arguments.requireNotNull(function, "'function' argument cannot be null");
 
+        Functor<Monad<V>> mappedMonad = map(function);
+        Monad<V> monad = (Monad<V>) mappedMonad;
         // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
-        M mappedThenFlattened = (M) mapped.join();
-
-        return mappedThenFlattened;
+        return (M) monad.join();
     }
 }

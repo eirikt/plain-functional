@@ -15,7 +15,8 @@ import land.plainfunctional.value.AbstractProtectedValue;
  * <b>
  * The value is either of the two given types.
  * The left-situated type is treated as the exceptional one.
- * </b>
+ * </b><br>
+ * So alternatively, the functor context may be interpreted as "a value, or something else".
  * </p>
  *
  * <p>
@@ -134,7 +135,7 @@ public interface Either<L, R> extends Monad<R> {
      *
      * @param onLeft  Supplier ("nullary" function/deferred constant) of the default value in case it is a 'Left'
      * @param onRight Function (unary) (the "catamorphism") to be applied to this functor's value in case it is a 'Right'
-     * @param <U>     The covariant type of the folded/returning value
+     * @param <U>     The type of the folded/returning value
      * @return the folded value
      */
     <U> U fold(Supplier<U> onLeft, Function<? super R, ? extends U> onRight);
@@ -157,21 +158,20 @@ public interface Either<L, R> extends Monad<R> {
         throw new UnsupportedOperationException("Not yet implemented");
     }
 
-    @Override
-    default <U> Either<L, U> apply(Applicative<Function<? super R, ? extends U>> functionInContext) {
+    default <V> Either<L, V> apply(Applicative<Function<? super R, ? extends V>> functionInContext) {
         Arguments.requireNotNull(functionInContext, "'functionInContext' argument cannot be null");
 
-        Either<L, Function<? super R, ? extends U>> eitherFunctionInContext =
-            (Either<L, Function<? super R, ? extends U>>) functionInContext;
+        // TODO: May throw 'ClassCastException'! (See inherited JavaDoc) Any chance of mitigating this - with Java's type system? (Lacking higher kinded types)
+        Either<L, Function<? super R, ? extends V>> eitherFunctionInContext =
+            (Either<L, Function<? super R, ? extends V>>) functionInContext;
 
         return eitherFunctionInContext.isLeft()
             // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
             // TODO: Well, also argue that this must be the case...
-            ? (Either.Left<L, U>) tryGetLeft()
+            ? (Either.Left<L, V>) tryGetLeft()
             // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
             // TODO: Well, also argue that this must be the case...
-            : (Either.Right<L, U>) right(eitherFunctionInContext.tryGet().apply(tryGet())
-        );
+            : (Either.Right<L, V>) right(eitherFunctionInContext.tryGet().apply(tryGet()));
     }
 
 
@@ -226,12 +226,12 @@ public interface Either<L, R> extends Monad<R> {
         }
 
         @Override
-        public Monad<R> join() {
+        public Either<L, R> join() {
             L left = this.value;
-            return left instanceof Either
+            return left instanceof Either<?, ?>
                 // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
                 // TODO: Well, also argue that this must be the case...
-                ? ((Either<L, R>) left).join()
+                ? (Either<L, R>) ((Either<?, ?>) left).join()
                 : this;
         }
     }
@@ -276,6 +276,8 @@ public interface Either<L, R> extends Monad<R> {
         @Override
         public <U> Either<L, U> map(Function<? super R, ? extends U> function) {
             Arguments.requireNotNull(function, "'function' argument cannot be null");
+            // Implementing homomorphism using a catamorphism.
+            // Because here, the "catamorphism" is accidentally equal to a regular homomorphism...
             return right(
                 fold(
                     () -> { throw new IllegalStateException(); },
@@ -285,12 +287,12 @@ public interface Either<L, R> extends Monad<R> {
         }
 
         @Override
-        public Monad<R> join() {
+        public Either<?, R> join() {
             R right = this.value;
-            return right instanceof Either
+            return right instanceof Either<?, ?>
                 // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
                 // TODO: Well, also argue that this must be the case...
-                ? ((Either<L, R>) right).join()
+                ? (Either<?, R>) ((Either<?, ?>) right).join()
                 : this;
         }
     }

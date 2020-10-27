@@ -8,6 +8,8 @@ import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
 import land.plainfunctional.value.AbstractProtectedValue;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 /**
  * <p>
  * <i>Functor context:</i>
@@ -97,6 +99,12 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
         return value == null
             ? nothing()
             : just(value);
+    }
+
+    public static Maybe<String> ofNonBlankString(String stringValue) {
+        return isBlank(stringValue)
+            ? nothing()
+            : just(stringValue);
     }
 
 
@@ -225,7 +233,7 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
      * </p>
      *
-     * "Plain functionally" (Haskell-style), "foldleft" <code>foldl</code> is defined as:
+     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
      * <p>
      * <code>
      * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
@@ -248,7 +256,7 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      *
      * @param onNothing Supplier ("nullary" function/deferred constant) of the default value in case it is 'Nothing'
      * @param onJust    Function (unary) (the "catamorphism") to be applied to this functor's value in case it is a 'Just'
-     * @param <U>       The covariant type of the folded/returning value
+     * @param <U>       The type of the folded/returning value
      * @return the folded value
      */
     public <U> U fold(Supplier<U> onNothing, Function<? super T, ? extends U> onJust) {
@@ -267,18 +275,11 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
         //    ? nothing()
         //    : just(function.apply(this.value.tryGet()));
 
-        // Also possible to implement homomorphism using catamorphism.
+        // It is also possible to implement homomorphism using a catamorphism.
         // Because here, the "catamorphism" is accidentally equal to a regular homomorphism...
         return fold(
             Maybe::nothing,
-            //(ignored) -> just(function.apply(this.value.tryGet()))
-            (ignored) -> just(
-                fold(
-                    //null,
-                    () -> { throw new IllegalStateException(); },
-                    function
-                )
-            )
+            (ignored) -> just(function.apply(this.value.tryGet()))
         );
     }
 
@@ -298,15 +299,16 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     }
 
     @Override
-    public <U> Maybe<U> apply(Applicative<Function<? super T, ? extends U>> functionInContext) {
+    public <V> Maybe<V> apply(Applicative<Function<? super T, ? extends V>> functionInContext) {
         Arguments.requireNotNull(functionInContext, "'functionInContext' argument cannot be null");
 
-        Maybe<Function<? super T, ? extends U>> maybeFunctionInContext =
-            (Maybe<Function<? super T, ? extends U>>) functionInContext;
+        // TODO: May throw 'ClassCastException'! (See inherited JavaDoc) Any chance of mitigating this - with Java's type system? (Lacking higher kinded types)
+        Maybe<Function<? super T, ? extends V>> maybeFunction =
+            (Maybe<Function<? super T, ? extends V>>) functionInContext;
 
-        return maybeFunctionInContext.isNothing()
-            ? (Maybe<U>) functionInContext
-            : just(maybeFunctionInContext.tryGet().apply(this.value.tryGet())
+        return maybeFunction.isNothing()
+            ? (Maybe<V>) functionInContext
+            : just(maybeFunction.tryGet().apply(this.value.tryGet())
         );
     }
 
@@ -327,7 +329,6 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
             // TODO: Well, also argue that this must be the case...
             return (Maybe<T>) this.value;
         }
-
         return nothing();
     }
 }

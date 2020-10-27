@@ -26,7 +26,7 @@ import land.plainfunctional.util.Arguments;
  * </p>
  *
  * <p>
- * With the identity element and the associative operation, we have all we need to "collapse the monoid";
+ * With the identity element and the associative operation, we have all we need for "collapsing the monoid";
  * Reducing all the elements into one single element&mdash;<i>folding</i>.
  * </p>
  *

@@ -84,7 +84,7 @@ public class FreeSemigroup<T> extends Semigroup<T> {
     }
 
     /**
-     * By providing a identity element, this semigroup may be promoted to a {@link FreeMonoid} instance.
+     * By providing a identity element, this semigroup can be promoted to a {@link FreeMonoid} instance.
      *
      * @param identityElement the monoid's identity element
      * @return a new 'FreeMonoid' instance

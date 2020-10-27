@@ -3,7 +3,10 @@ package land.plainfunctional.algebraicstructure;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.SortedSet;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.BinaryOperator;
+
+import land.plainfunctional.util.Arguments;
 
 /**
  * A <b>semigroup</b> is an <i>associative magma</i>.
@@ -36,7 +39,8 @@ public class Semigroup<T> extends Magma<T> {
         LinkedHashSet<T> linkedHashSet,
         BinaryOperator<T> binaryOperation
     ) {
-        super(linkedHashSet, binaryOperation);
+        // Creates a shallow copy of the provided 'LinkedHashSet' argument
+        super(new LinkedHashSet<>(linkedHashSet), binaryOperation);
     }
 
     /**
@@ -47,11 +51,12 @@ public class Semigroup<T> extends Magma<T> {
         SortedSet<T> sortedSet,
         BinaryOperator<T> binaryOperation
     ) {
-        super(sortedSet, binaryOperation);
+        // Creates a shallow copy of the provided 'SortedSet' argument
+        super(new ConcurrentSkipListSet<>(sortedSet), binaryOperation);
     }
 
     /**
-     * By providing a identity element, this semigroup may be promoted to a {@link Monoid} instance.
+     * By providing a identity element, this semigroup can be promoted to a {@link Monoid} instance.
      *
      * @param identityElement the monoid's identity element
      * @return a new 'Monoid' instance

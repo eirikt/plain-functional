@@ -130,6 +130,7 @@ public class FreeMonoid<T> extends Monoid<T> {
      * starting with the identity value, and appending/adding the left-most (first) element,
      * defined by this monoid's sorted set order -
      * and then appending/adding the rest of the elements "going to the right".
+     * Do notice that the first 'append' parameter acts as the accumulated value while folding.
      * </p>
      *
      * @return the folded value

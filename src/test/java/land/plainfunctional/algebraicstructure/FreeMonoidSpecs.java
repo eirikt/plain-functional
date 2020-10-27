@@ -41,8 +41,7 @@ class FreeMonoidSpecs {
             (SortedSet<?>) null,
             null,
             null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A magma must have a set of values");
+            .isInstanceOf(NullPointerException.class);
 
         assertThatThrownBy(() -> new FreeMonoid<String>(
             emptySortedSet(),

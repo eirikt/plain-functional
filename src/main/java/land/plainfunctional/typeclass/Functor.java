@@ -4,7 +4,7 @@ import java.util.function.Function;
 
 /**
  * <p>
- * <i>A <b>functor</b> is a value/values in a context.</i>
+ * <i>A <b>functor</b> is a value/values in a context.</i><br>
  * The context may range from being structural (e.g. a container of some kind), to being semantical (e.g. "the value may or may not be present").
  * </p>
  *

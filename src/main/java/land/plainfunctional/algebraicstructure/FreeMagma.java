@@ -66,6 +66,7 @@ public class FreeMagma<T> extends Magma<T> {
      * @param element2 a magma element
      * @return a resulting magma element, or a bottom value if the result is not an element of this magma
      * @throws IllegalArgumentException if the element values are equal
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
      */
     @Override
     public T append(T element1, T element2) {

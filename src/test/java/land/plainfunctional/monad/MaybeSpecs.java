@@ -1,6 +1,7 @@
 package land.plainfunctional.monad;
 
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -8,8 +9,11 @@ import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
+import land.plainfunctional.algebraicstructure.FreeMonoid;
 import land.plainfunctional.testdomain.TestFunctions;
 import land.plainfunctional.testdomain.vanillaecommerce.MutableCustomer;
+import land.plainfunctional.testdomain.vanillaecommerce.Person;
+import land.plainfunctional.typeclass.Applicative;
 
 import static java.lang.Integer.sum;
 import static java.lang.String.format;
@@ -18,6 +22,7 @@ import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.monad.Maybe.of;
 import static land.plainfunctional.monad.Maybe.withMaybe;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
+import static land.plainfunctional.testdomain.vanillaecommerce.Person.Gender.MALE;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -270,9 +275,24 @@ class MaybeSpecs {
         Function<Integer, Integer> appliedCurriedPlusTwo = curriedPlus.apply(2);
 
         Maybe<Function<? super Integer, ? extends Integer>> maybeAppliedCurriedPlusTwo = just(appliedCurriedPlusTwo);
-        Maybe<Integer> maybeSum = just(3).apply(maybeAppliedCurriedPlusTwo);
+        Maybe<Integer> maybeSum = (Maybe<Integer>) just(3).apply(maybeAppliedCurriedPlusTwo);
 
         assertThat(maybeSum.tryGet()).isEqualTo(5);
+    }
+
+    @Test
+    void NB_whenApplyingSiblingApplicativeType_willThrowClassCastException() {
+        Function<String, Function<String, Integer>> curriedStringLength =
+            (string1) ->
+                (string2) ->
+                    string1.length() + string2.length();
+
+        Function<String, Integer> appliedStringLength = curriedStringLength.apply("Two");
+
+        assertThatThrownBy(
+            () -> just("Three").apply(Sequence.of(appliedStringLength))
+        ).isInstanceOf(ClassCastException.class)
+         .hasMessageContaining("land.plainfunctional.monad.Sequence cannot be cast to land.plainfunctional.monad.Maybe");
     }
 
     @Test
@@ -332,7 +352,7 @@ class MaybeSpecs {
 
         assertThat(maybeSum.tryGet()).isEqualTo(1 + 2 + 3 + 4);
 
-        // Or 'map' of curried binary functions
+        // Or, more interesting, a 'map' of curried binary functions
         maybeSum = just(1)
             .apply(just(2).map(curriedPlus))
             .apply(just(3).map(curriedPlus))
@@ -549,6 +569,169 @@ class MaybeSpecs {
         //    )
         //);
         //assertThat(maybeInfoString.isNothing()).isTrue();
+    }
+
+    /*
+    @Test
+    void shouldDoValidationAndStuffLikeThat_2() {
+        Function<Sequence<? super String>, Function<Sequence<? extends String>, Sequence<String>>> curriedSequenceOfStringAppend =
+            (list1) ->
+                (list2) -> {
+                    if (isEmpty(list1)) {
+                        return list2;
+                    }
+                    List<String> stringList = list2.toJavaList();
+                    stringList.addAll(list1.toJavaList());
+                    return Sequence.of(stringList);
+                };
+
+        Function<Integer, Sequence<String>> getNegativeNumberInfo =
+            (integer) ->
+                integer < 0
+                    ? Sequence.of(format("%d is a negative number", integer))
+                    : Sequence.empty();
+
+        Function<Integer, Sequence<String>> getGreaterThanTenInfo =
+            (integer) ->
+                integer > 10
+                    ? Sequence.of(format("%d is greater than 10", integer))
+                    : Sequence.empty();
+
+        Maybe<Integer> justMinus13 = just(-13);
+
+        Maybe<Sequence<String>> maybeInfoString = just(Sequence.empty());
+        Maybe<Sequence<String>> d1 = justMinus13.map(getGreaterThanTenInfo);
+        Maybe<Function<Sequence<String>, Sequence<String>>> d2 = d1.map(curriedSequenceOfStringAppend);
+
+        maybeInfoString = maybeInfoString
+            .apply(d2);
+
+        Maybe<Sequence<String>> d3 = justMinus13.map(getNegativeNumberInfo);
+        Maybe<Function<Sequence<String>, Sequence<String>>> d4 = d3.map(curriedSequenceOfStringAppend);
+
+        maybeInfoString = maybeInfoString
+            .apply(d4);
+
+        Sequence<String> stringList = maybeInfoString.tryGet();
+        assertThat(stringList.size()).isEqualTo(1);
+        assertThat(stringList.toJavaList().get(0)).isEqualTo("-13 is a negative number");
+    }
+    */
+
+    @Test
+    void shouldDoValidationAndStuffLikeThat_3() {
+        Function<Sequence<String>, Function<Sequence<String>, Sequence<String>>> curriedSequenceOfStringAppend =
+            (list1) -> (list2) -> {
+                if (list2.isEmpty()) {
+                    return list1;
+                }
+                list1.values.addAll(list2.values);
+                return list1;
+            };
+
+        Function<Integer, Sequence<String>> getNegativeNumberInfo =
+            (integer) ->
+                integer < 0
+                    ? Sequence.of(format("%d is a negative number", integer))
+                    : Sequence.empty();
+
+        Maybe<Integer> justMinus13 = just(-13);
+
+        Maybe<Sequence<String>> maybeInfoString1 = just(Sequence.empty());
+        Applicative<Function<? super Sequence<String>, ? extends Sequence<String>>> d4 =
+            justMinus13
+                .map(getNegativeNumberInfo)
+                .map(curriedSequenceOfStringAppend);
+        maybeInfoString1 = maybeInfoString1.apply(d4);
+
+        Sequence<String> stringList = maybeInfoString1.tryGet();
+        assertThat(stringList.size()).isEqualTo(1);
+        assertThat(stringList.toJavaList().get(0)).isEqualTo("-13 is a negative number");
+
+
+        Maybe<Sequence<String>> maybeInfoString2 =
+            just(Sequence.<String>empty())
+                .apply(justMinus13
+                    .map(getNegativeNumberInfo)
+                    .map(curriedSequenceOfStringAppend)
+                );
+
+        assertThat(maybeInfoString2.tryGet().size()).isEqualTo(1);
+        assertThat(maybeInfoString2.tryGet().values.get(0)).isEqualTo("-13 is a negative number");
+
+
+        /*
+        Maybe<Sequence<String>> maybeInfoString = just(Sequence.empty());
+        Maybe<Function<Sequence<String>, Sequence<String>>> d2 =
+            justMinus13
+                .map(getNegativeNumberInfo)
+                .map(curriedSequenceOfStringAppend);
+        maybeInfoString = maybeInfoString.apply2(d2);
+
+        Sequence<String> stringList = maybeInfoString.tryGet();
+        assertThat(stringList.size()).isEqualTo(1);
+        assertThat(stringList.toJavaList().get(0)).isEqualTo("-13 is a negative number");
+        */
+    }
+
+    @Test
+    void shouldDoValidationAndStuffLikeThat_4() {
+        Function<String, Function<String, String>> curriedStringAppender =
+            (string1) -> (string2) -> isBlank(string2) ? string1 : string1 + ", " + string2;
+
+        Function<Integer, String> getNegativeNumberInfo =
+            (integer) ->
+                integer < 0
+                    ? format("%d is a negative number", integer)
+                    : "";
+
+        Function<Integer, String> getGreaterThanTenInfo =
+            (integer) ->
+                integer > 10
+                    ? format("%d is greater than 10", integer)
+                    : "";
+
+        Maybe<Integer> justMinus13 = just(-13);
+        Maybe<Integer> just7 = just(7);
+
+        LinkedHashSet<Maybe<String>> s = new LinkedHashSet<>();
+        s.add(just7.map(getGreaterThanTenInfo));
+        s.add(just7.map(getNegativeNumberInfo));
+
+        BinaryOperator<Maybe<String>> o = (maybeString1, maybeString2) -> {
+            if (maybeString2.isNothing()) {
+                return maybeString1;
+            }
+            if (maybeString1.isNothing()) {
+                return maybeString2;
+            }
+            String string1 = maybeString1.getOrNull();
+            String string2 = maybeString2.getOrNull();
+
+            //String appendedString = curriedStringAppender.apply(string1).apply(string2);
+
+            //return isBlank(appendedString)
+            //    ? nothing()
+            //    : just(appendedString
+            //);
+
+            return Maybe.ofNonBlankString(curriedStringAppender.apply(string1).apply(string2));
+        };
+
+        FreeMonoid<Maybe<String>> m = new FreeMonoid<>(s, o, just(""));
+
+        Maybe<String> maybeInfoString = m.fold();
+        assertThat(maybeInfoString.isNothing()).isTrue();
+
+        s.clear();
+        s.add(justMinus13.map(getGreaterThanTenInfo));
+        s.add(justMinus13.map(getNegativeNumberInfo));
+
+        m = new FreeMonoid<>(s, o, just(""));
+
+        maybeInfoString = m.fold();
+        assertThat(maybeInfoString.isNothing()).isFalse();
+        assertThat(maybeInfoString.tryGet()).isEqualTo("-13 is a negative number");
     }
 
 
@@ -828,7 +1011,6 @@ class MaybeSpecs {
             //(Supplier<Boolean>) nullSupplier,
             TestFunctions::isEven
         );
-
         assertThat(isEven).isTrue();
 
 
@@ -836,7 +1018,34 @@ class MaybeSpecs {
             nullBooleanSupplier,
             TestFunctions::isEven
         );
-
         assertThat(isEven).isFalse();
+    }
+
+    @Test
+    void shouldUseFoldAsLens() {
+        Person person = new Person();
+        person.name = "John";
+        person.gender = MALE;
+        person.birthDate = LocalDate.of(1980, 1, 10);
+
+        Maybe<Person> maybePerson = just(person);
+
+        LocalDate johnsBirthDate = maybePerson.fold(
+            () -> null,
+            (p) -> p.birthDate
+        );
+        assertThat(johnsBirthDate).isEqualTo(person.birthDate);
+
+        // Alternatively, the more "uglier"
+        johnsBirthDate = maybePerson.getOrDefault(Person.IDENTITY).birthDate;
+        assertThat(johnsBirthDate).isEqualTo(person.birthDate);
+
+        // Alternatively, the even more "uglier"
+        johnsBirthDate = maybePerson.getOrNull().birthDate;
+        assertThat(johnsBirthDate).isEqualTo(person.birthDate);
+
+        // Alternatively, the even even more "uglier"
+        johnsBirthDate = maybePerson.tryGet().birthDate;
+        assertThat(johnsBirthDate).isEqualTo(person.birthDate);
     }
 }

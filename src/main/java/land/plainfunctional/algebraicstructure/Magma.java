@@ -1,13 +1,16 @@
 package land.plainfunctional.algebraicstructure;
 
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.function.BinaryOperator;
 
 import land.plainfunctional.util.Arguments;
 
 /**
  * In abstract algebra, a <b>magma</b> is a basic kind of <i>algebraic structure</i>.
- * A magma consists of a set of values equipped with a single binary operation that must be <i>closed</i> by definition.
+ * A magma consists of a set of values equipped with a single binary operation that must by definition be <i>closed</i>.
  *
  * <p>
  * <i>Formally:</i> To qualify as a magma, the set 𝕊 and the binary operation • must satisfy the following requirement, known as the <i>magma-</i>, <i>totality-</i> or <i>closure axiom</i>:<br>
@@ -20,7 +23,7 @@ import land.plainfunctional.util.Arguments;
  *
  * <p>
  * Functions whose domain is equal to its codomain, are known as <i>endofunctions</i>.
- * (A homomorphic endofunction is an <i>endomorphism</i>, and is the usually the case.)
+ * (A homomorphic endofunction is an <i>endomorphism</i>, and that is mostly the case.)
  * </p>
  *
  * <p>
@@ -37,7 +40,6 @@ import land.plainfunctional.util.Arguments;
  * @see <a href="https://en.wikipedia.org/wiki/Magma_(algebra)">Magma (Wikipedia)</a>
  * @see <a href="https://en.wikipedia.org/wiki/Endomorphism">Endomorphism (Wikipedia)</a>
  * @see <a href="https://en.wikipedia.org/wiki/Homomorphism">Homomorphism (Wikipedia)</a>
- * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
  */
 public class Magma<T> {
 
@@ -64,7 +66,12 @@ public class Magma<T> {
     public Magma(Set<T> set, BinaryOperator<T> binaryOperation) {
         Arguments.requireNotNull(set, "A magma must have a set of values");
         Arguments.requireNotNull(binaryOperation, "A magma must have a closed binary operation");
-        this.set = set;
+        if (set instanceof SortedSet || set instanceof LinkedHashSet) {
+            this.set = set;
+        } else {
+            // Creates a shallow copy of the provided 'Set' argument
+            this.set = new HashSet<>(set);
+        }
         this.binaryOperation = binaryOperation;
     }
 
@@ -84,7 +91,8 @@ public class Magma<T> {
      * @param element2 a magma element
      * @return a resulting magma element, or a bottom value if the result is not an element of this magma
      * @throws IllegalArgumentException if one or both of the arguments are not elements of this magma
-     * @throws IllegalStateException    if the result of the applied operation is not element of this magma
+     * @throws IllegalStateException    if the result of the applied operation is not an element of this magma
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
      */
     public T append(T element1, T element2) {
         Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");

@@ -1,13 +1,19 @@
 package land.plainfunctional.monad;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
+import land.plainfunctional.algebraicstructure.FreeMonoid;
 import land.plainfunctional.typeclass.Applicative;
 import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
@@ -22,17 +28,14 @@ import land.plainfunctional.util.Arguments;
  *
  * <p>
  * Sequences is also known as <i>lists</i>.
- * </p>
- *
- * <p>
  * ({@link Sequence} delegates to an {@link ArrayList} instance.)
  * </p>
  *
  * <p>
- * The contained values are also known as <i>elements</i> (of the sequence/list).
+ * The contained values are also known as <i>elements</i> or <i>items</i> (of the sequence/list).
  * </p>
  *
- * @param <T> The type of the contained values
+ * @param <T> The type of the values in the sequence
  * @see <a href="https://en.wikipedia.org/wiki/Sequence">Mathematical sequences</a>
  * @see <a href="https://en.wikipedia.org/wiki/List_(abstract_data_type)">List (abstract data type)</a>
  */
@@ -84,6 +87,13 @@ public class Sequence<T> implements Monad<T> {
      */
     public static <T> Sequence<T> of(Iterable<? extends T> values) {
         return new Sequence<>(values);
+    }
+
+    /**
+     * @return a {@link Sequence} containing the given values
+     */
+    public static <T> Sequence<T> of(Supplier<Iterable<T>> values) {
+        return new Sequence<>(values.get());
     }
 
 
@@ -140,17 +150,6 @@ public class Sequence<T> implements Monad<T> {
         return this.values.size();
     }
 
-    /**
-     * @return a shallow copy of this sequence (of values)
-     */
-    public List<T> toJavaList() {
-        return new ArrayList<>(this.values);
-    }
-
-    List<T> _unsafe() {
-        return this.values;
-    }
-
 
     ///////////////////////////////////////////////////////
     // Functor properties
@@ -165,7 +164,7 @@ public class Sequence<T> implements Monad<T> {
             // Partial function handling:
             // NB! Skipping inclusion as mapped value has no representation in the codomain
             if (mappedValue == null) {
-                System.err.printf("NB! 'Sequence::map': Skipping mapping as value has no representation in the codomain, %s%n", value);
+                System.err.printf("NB! 'Sequence::map': Skipping mapping! Value has no representation in the codomain (%s)%n", value);
                 continue;
             }
 
@@ -196,9 +195,32 @@ public class Sequence<T> implements Monad<T> {
     //    return new Sequence<>(iterable);
     //}
 
+
+    // TODO: Add use case examples for sequence as applicative functor
     @Override
-    public <U> Sequence<U> apply(Applicative<Function<? super T, ? extends U>> functionInContext) {
-        throw new UnsupportedOperationException("Not yet implemented");
+    public <V> Sequence<V> apply(Applicative<Function<? super T, ? extends V>> functionInContext) {
+        Arguments.requireNotNull(functionInContext, "'functionInContext' argument cannot be null");
+
+        // TODO: May throw 'ClassCastException'! (See inherited JavaDoc) Any chance of mitigating this - with Java's type system? (Lacking higher kinded types)
+        Sequence<Function<? super T, ? extends V>> functionInSequence =
+            (Sequence<Function<? super T, ? extends V>>) functionInContext;
+
+        Function<? super T, ? extends V> function = functionInSequence.values.get(0);
+
+        List<V> mappedValues = new ArrayList<>(this.values.size());
+        for (T value : this.values) {
+            V mappedValue = function.apply(value);
+
+            // Partial function handling:
+            // NB! Skipping inclusion as mapped value has no representation in the codomain
+            if (mappedValue == null) {
+                System.err.printf("NB! 'Sequence::apply': Skipping mapping! Value has no representation in the codomain (%s)%n", value);
+                continue;
+            }
+
+            mappedValues.add(mappedValue);
+        }
+        return new Sequence<>(mappedValues);
     }
 
 
@@ -212,22 +234,219 @@ public class Sequence<T> implements Monad<T> {
         for (T element : this.values) {
             if (element instanceof Sequence) {
                 Sequence<?> wrappedElement = ((Sequence<?>) element);
-                List<?> _unsafeWrappedElement = wrappedElement._unsafe();
-                if (_unsafeWrappedElement.isEmpty()) {
-                    // TODO: Figure out validity and what to do here...
-                    throw new IllegalStateException("TODO: \"Wrapped\" 'Sequence' element is empty");
-                }
-                if (_unsafeWrappedElement.size() > 1) {
-                    // TODO: Figure out validity and what to do here...
-                    throw new IllegalStateException("TODO: \"Wrapped\" 'Sequence' element contains more than one elements");
-                }
-                // TODO: Validate with tests
-                // TODO: You can break this one, can't you? Which functions (the types of it) can be mapped...?
-                element = (T) _unsafeWrappedElement.get(0);
+                // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
+                // TODO: Well, also argue that this must be the case...
+                List<? extends T> _unsafeWrappedElement = (List<? extends T>) wrappedElement._unsafe();
+
+                flattenedValues.addAll(_unsafeWrappedElement);
+
+            } else {
+                flattenedValues.add(element);
             }
-            flattenedValues.add(element);
         }
         return new Sequence<>(flattenedValues);
+    }
+
+
+    ///////////////////////////////////////////////////////
+    // Fold methods
+    ///////////////////////////////////////////////////////
+
+    /**
+     * <p>
+     * To <i>fold</i> a value means creating a new representation of it.
+     * </p>
+     *
+     * <p>
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
+     * </p>
+     *
+     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>
+     * "Left fold"/"Fold-left" starts with the identity value,
+     * and appends/adds the left-most (first) element in this sequence,
+     * and then appends/adds the rest of the elements "going to the right".
+     * Do notice that the first 'append' parameter acts as the accumulated value while folding.
+     * </p>
+     *
+     * @param identityValue The identity value, acting as the initial value of this fold operation
+     * @param catamorphism  The fold function
+     * @param <U>           The type of the folded/returning value
+     * @return the folded value
+     */
+    public <U> U foldLeft(BiFunction<U, ? super T, ? extends U> catamorphism, U identityValue) {
+        return foldLeft(identityValue, catamorphism);
+    }
+
+    /**
+     * <code>foldLeft</code> variant with swapped parameters.
+     */
+    public <U> U foldLeft(U identityValue, BiFunction<U, ? super T, ? extends U> catamorphism) {
+        U foldedValue = identityValue;
+        for (T value : this.values) {
+            foldedValue = catamorphism.apply(foldedValue, value);
+        }
+        return foldedValue;
+    }
+
+    /**
+     * <p>
+     * To <i>fold</i> a value means creating a new representation of it.
+     * </p>
+     *
+     * <p>
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
+     * </p>
+     *
+     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>
+     * "Right fold"/"Fold-right" starts with the identity value,
+     * and appends/adds the right-most (first) element in this sequence,
+     * and then appends/adds the rest of the elements "going to the left".
+     * Do notice that the first 'append' parameter acts as the accumulated value while folding.
+     * </p>
+     *
+     * @param identityValue The identity value, acting as the initial value of this fold operation
+     * @param catamorphism  The fold function
+     * @param <U>           The type of the folded/returning value
+     * @return the folded value
+     */
+    public <U> U foldRight(BiFunction<U, ? super T, ? extends U> catamorphism, U identityValue) {
+        return foldRight(identityValue, catamorphism);
+    }
+
+    /**
+     * <code>foldRight</code> variant with swapped parameters.
+     */
+    public <U> U foldRight(U identityValue, BiFunction<U, ? super T, ? extends U> catamorphism) {
+        U foldedValue = identityValue;
+        ListIterator<T> listIterator = this.values.listIterator(this.values.size());
+        while (listIterator.hasPrevious()) {
+            foldedValue = catamorphism.apply(foldedValue, listIterator.previous());
+        }
+        return foldedValue;
+    }
+
+
+    ///////////////////////////////////////////////////////
+    // Append methods
+    ///////////////////////////////////////////////////////
+
+    /**
+     * @param sequence1 the original sequence
+     * @param sequence2 a sequence, which elements will be appended to the first sequence parameter
+     * @return a new sequence, consisting of the first sequence's elements followed by the second sequences' elements
+     */
+    public static <T> Sequence<T> append(Sequence<T> sequence1, Sequence<T> sequence2) {
+        List<T> appendedList = sequence1.toJavaList();
+        appendedList.addAll(sequence2.values);
+
+        return new Sequence<>(appendedList);
+    }
+
+    /**
+     * @param sequence the original sequence
+     * @param value    the value to be appended
+     * @return a new sequence, consisting of the given sequence's elements followed by the given value
+     */
+    public static <T> Sequence<T> append(Sequence<T> sequence, T value) {
+        List<T> appendedList = sequence.toJavaList();
+        appendedList.add(value);
+
+        return new Sequence<>(appendedList);
+    }
+
+    /**
+     * @param sequence the sequence, which elements will be appended
+     * @return a new sequence, consisting of this sequence's elements followed by the values in the given {@link Sequence} parameter
+     */
+    public Sequence<T> append(Sequence<T> sequence) {
+        return append(this, sequence);
+    }
+
+    /**
+     * @param iterable the values to be appended
+     * @return a new sequence, consisting of this sequence's elements followed by the values in the given {@link Iterable} parameter
+     */
+    public Sequence<T> append(Iterable<T> iterable) {
+        return append(new Sequence<>(iterable));
+    }
+
+    /**
+     * @param value the value to be appended
+     * @return a new sequence, consisting of this sequence's elements followed by the given value
+     */
+    public Sequence<T> append(T value) {
+        return append(this, value);
+    }
+
+
+    ///////////////////////////////////////////////////////
+    // "Re-wrappings"
+    ///////////////////////////////////////////////////////
+
+    /**
+     * @return the internal data structure
+     */
+    protected List<? extends T> _unsafe() {
+        return this.values;
+    }
+
+    /**
+     * @return a shallow copy of this sequence (of values)
+     */
+    public List<T> toJavaList() {
+        return new ArrayList<>(this.values);
+    }
+
+    /**
+     * @param binaryOperation associative and closed binary operation
+     * @param identityElement identity element
+     * @return a new monoid based on this sequence's elements (as the monoid set), and the given operation and identity element
+     */
+    public FreeMonoid<T> toFreeMonoid(BinaryOperator<T> binaryOperation, T identityElement) {
+        return toFreeMonoid(identityElement, binaryOperation);
+    }
+
+    /**
+     * <code>toFreeMonoid</code> variant with swapped parameters.
+     */
+    public FreeMonoid<T> toFreeMonoid(T identityElement, BinaryOperator<T> binaryOperation) {
+        LinkedHashSet<T> associativeSet = new LinkedHashSet<>(this.values);
+
+        return new FreeMonoid<>(associativeSet, binaryOperation, identityElement);
     }
 
 

@@ -58,8 +58,7 @@ class FreeSemigroupSpecs {
     @Test
     void binaryConstructor_whenNullArgs_shouldThrowException() {
         assertThatThrownBy(() -> new FreeSemigroup<>((SortedSet<?>) null, null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A magma must have a set of values");
+            .isInstanceOf(NullPointerException.class);
 
         assertThatThrownBy(() -> new FreeSemigroup<String>(emptySortedSet(), null))
             .isInstanceOf(IllegalArgumentException.class)
