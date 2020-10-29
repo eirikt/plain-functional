@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
@@ -241,11 +242,26 @@ class SequenceSpecs {
         foldedSequence = sequence.toFreeMonoid(Person::append, new Person()).fold();
         assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
 
-        foldedSequence = sequence.foldRight(new Person(), Person::append);
+
+        // Nope!
+        //foldedSequence = sequence.foldRight(new Person(), Person::append);
+        //assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
+
+        foldedSequence = sequence.foldRight(
+            new Person(),
+            (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append)
+        );
         assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
 
-        Person.IDENTITY.name = "";
-        foldedSequence = sequence.foldRight(Person::append, Person.identity());
+        // Nope!
+        //Person.IDENTITY.name = "";
+        //foldedSequence = sequence.foldRight(Person::append, Person.identity());
+        //assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
+
+        foldedSequence = sequence.foldRight(
+            (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append),
+            Person.identity()
+        );
         assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
     }
 
@@ -516,9 +532,9 @@ class SequenceSpecs {
                     Sequence.of(int1, int2);
 
         //Sequence<Integer> appendedSequence = Sequence
-            //.of(1, 2, 3)
-            //.apply(Sequence.of(curriedIntegerSequenceAppend.apply(Sequence.of(4, 5, 6))));
-            //.apply(aa.apply(1));
+        //.of(1, 2, 3)
+        //.apply(Sequence.of(curriedIntegerSequenceAppend.apply(Sequence.of(4, 5, 6))));
+        //.apply(aa.apply(1));
 
         //assertThat(appendedSequence.size()).isEqualTo(6);
     }
@@ -999,8 +1015,7 @@ class SequenceSpecs {
 
         assertThat(mappedSequence2.size()).isEqualTo(3);
     }
-
-     */
+    */
 
     @Test
     void when_shouldBind_00() {
@@ -1184,7 +1199,7 @@ class SequenceSpecs {
     @Test
     void shouldAppendElement() {
         Sequence<Integer> seq1 = Sequence
-            .of(1,2,3);
+            .of(1, 2, 3);
 
         assertThat(seq1.isEmpty()).isFalse();
         assertThat(seq1.size()).isEqualTo(3);
@@ -1204,13 +1219,13 @@ class SequenceSpecs {
     @Test
     void shouldAppendElements() {
         Sequence<Integer> seq1 = Sequence
-            .of(1,2,3);
+            .of(1, 2, 3);
 
         assertThat(seq1.isEmpty()).isFalse();
         assertThat(seq1.size()).isEqualTo(3);
 
         Sequence<Integer> seq2 = Sequence
-            .of(1,2,3);
+            .of(1, 2, 3);
 
         assertThat(seq1).isEqualTo(seq2);
         assertThat(seq1).isNotSameAs(seq2);
@@ -1313,6 +1328,43 @@ class SequenceSpecs {
             .map(keepOnlyChar.apply('e'))
             .foldLeft("", String::concat);
         assertThat(foldedString).isEqualTo("eeee");
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Filter semantics
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Test
+    void shouldFilter() {
+        Predicate<String> fourLetterWords = (string) -> string.length() == 4;
+
+        Sequence<String> seq = Sequence.of("one", "two", "three", "four", "five", "six");
+
+        assertThat(seq.filter(fourLetterWords)).isEqualTo(Sequence.of("four", "five"));
+    }
+
+    @Test
+    void shouldRemove() {
+        Predicate<String> fourLetterWords = (string) -> string.length() == 4;
+
+        Sequence<String> seq = Sequence.of("one", "two", "three", "four", "five", "six");
+
+        assertThat(seq.remove(fourLetterWords)).isEqualTo(Sequence.of("one", "two", "three", "six"));
+    }
+
+    @Test
+    void filterAndRemoveShouldBeComplementary() {
+        Predicate<String> fourLetterWords = (string) -> string.length() == 4;
+
+        Sequence<String> seq = Sequence.of("one", "two", "three", "four", "five", "six");
+
+        Sequence<String> seq2 = seq
+            .keep(fourLetterWords)
+            .remove(fourLetterWords);
+
+        assertThat(seq2.toJavaList()).isEmpty();
+        assertThat(seq2).isEqualTo(Sequence.empty());
     }
 
 

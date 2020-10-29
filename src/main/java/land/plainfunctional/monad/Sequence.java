@@ -7,6 +7,7 @@ import java.util.ListIterator;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;
@@ -140,7 +141,7 @@ public class Sequence<T> implements Monad<T> {
      * @return 'true' if this sequence (of values) contains no elements, otherwise 'false'
      */
     public boolean isEmpty() {
-        return this.values.isEmpty();
+        return size() < 1;
     }
 
     /**
@@ -249,6 +250,87 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
+    // Filter methods
+    ///////////////////////////////////////////////////////
+
+    /**
+     * Alias of <code>filter</code>.
+     */
+    public Sequence<T> select(Predicate<T> predicate) {
+        return filter(predicate);
+    }
+
+    /**
+     * Alias of <code>filter</code>.
+     */
+    public Sequence<T> keep(Predicate<T> predicate) {
+        return filter(predicate);
+    }
+
+    /**
+     * "Plain functionally" (Haskell-style), 'filter' is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;filter :: (a -&gt; Boolean) -&gt; f a -&gt; f a
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>:
+     * The 'filter' function takes a predicate (a function which returns a boolean value), <code>a -&gt; Boolean</code>,
+     * applies it a functor (typically with a container-like structure) of type <code>a</code>&mdash;returning
+     * a <i>new functor of the same type containing all of the values from the original functor satisfying the <code>keepCondition</code> predicate</i>.
+     * Do notice the phrase "values from the original functor".
+     * One cannot include "new" values not already present in the input structure.
+     * This is because there just isn't enough information to create a new value&mdash;the
+     * only thing we know is that it is of type <code>a</code>.
+     * This is an example of the strength of parametric polymorphism.
+     * (The less we know about the type, the more we know about the implementation.)
+     * </p>
+     *
+     * <p>
+     * So, <code>filter</code> finds and returns all elements that satisfies the given predicate condition.
+     * This value projection operation is also known as 'find' operation and the relational 'select' operation.
+     * </p>
+     *
+     * <p>
+     * <code>filter</code> is a special case of <i>folding</i>.
+     * It is implemented using <code>foldLeft</code> in this library:<br>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl  &nbsp;:: (b &nbsp;&nbsp;-&gt; a -&gt; b&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;) -&gt; b &nbsp;&nbsp;-&gt; f a -&gt; b<br>
+     * &nbsp;&nbsp;&nbsp;&nbsp;filter :: (f a -&gt; a -&gt; Boolean) -&gt; f a -&gt; f a -&gt; f a &nbsp;&nbsp;&lt;=&gt;&nbsp;&nbsp; (a -&gt; Boolean) -&gt; f a -&gt; f a
+     * </code>
+     * </p>
+     *
+     * @param keepCondition The predicate function, acting like the "keep condition"
+     * @return The new filtered sequence, empty if no elements satisfy the predicate condition
+     */
+    public Sequence<T> filter(Predicate<T> keepCondition) {
+        Arguments.requireNotNull(keepCondition, "'keepCondition' argument cannot be null");
+        return foldLeft(
+            Sequence.empty(),
+            (sequenceOfApprovedValues, value) -> keepCondition.test(value)
+                ? sequenceOfApprovedValues.append(value)
+                : sequenceOfApprovedValues
+        );
+    }
+
+    /**
+     * Complementary version of <code>filter</code>,
+     * using the <code>predicate</code> parameter as the "remove condition".
+     */
+    public Sequence<T> remove(Predicate<T> removeCondition) {
+        Arguments.requireNotNull(removeCondition, "'removeCondition' argument cannot be null");
+        return foldLeft(
+            Sequence.empty(),
+            (sequenceOfApprovedValues, value) -> !removeCondition.test(value)
+                ? sequenceOfApprovedValues.append(value)
+                : sequenceOfApprovedValues
+        );
+    }
+
+
+    ///////////////////////////////////////////////////////
     // Fold methods
     ///////////////////////////////////////////////////////
 
@@ -272,7 +354,8 @@ public class Sequence<T> implements Monad<T> {
      * </p>
      *
      * <p>
-     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * <i>This means</i>:
+     * A binary function <code>b -&gt; a -&gt; b</code>,
      * together with an initial value of type <code>b</code>,
      * is applied to a functor <code>f</code> of type <code>a</code>,
      * returning a new value of type<code>b</code>.
@@ -282,7 +365,7 @@ public class Sequence<T> implements Monad<T> {
      * "Left fold"/"Fold-left" starts with the identity value,
      * and appends/adds the left-most (first) element in this sequence,
      * and then appends/adds the rest of the elements "going to the right".
-     * Do notice that the first 'append' parameter acts as the accumulated value while folding.
+     * Do notice that the <i>first</i> 'append' parameter acts as the accumulated value while folding.
      * </p>
      *
      * @param identityValue The identity value, acting as the initial value of this fold operation
@@ -317,15 +400,16 @@ public class Sequence<T> implements Monad<T> {
      * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
      * </p>
      *
-     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
+     * "Plain functionally" (Haskell-style), "foldright" (<code>foldr</code>) is defined as:
      * <p>
      * <code>
-     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldr :: (a -&gt; b -&gt; b) -&gt; b -&gt; f a -&gt; b
      * </code>
      * </p>
      *
      * <p>
-     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * <i>This means</i>:
+     * A binary function <code>a -&gt; b -&gt; b</code>,
      * together with an initial value of type <code>b</code>,
      * is applied to a functor <code>f</code> of type <code>a</code>,
      * returning a new value of type<code>b</code>.
@@ -335,7 +419,7 @@ public class Sequence<T> implements Monad<T> {
      * "Right fold"/"Fold-right" starts with the identity value,
      * and appends/adds the right-most (first) element in this sequence,
      * and then appends/adds the rest of the elements "going to the left".
-     * Do notice that the first 'append' parameter acts as the accumulated value while folding.
+     * Do notice that the <i>second</i> 'append' parameter acts as the accumulated value while folding.
      * </p>
      *
      * @param identityValue The identity value, acting as the initial value of this fold operation
@@ -343,18 +427,18 @@ public class Sequence<T> implements Monad<T> {
      * @param <U>           The type of the folded/returning value
      * @return the folded value
      */
-    public <U> U foldRight(BiFunction<U, ? super T, ? extends U> catamorphism, U identityValue) {
+    public <U> U foldRight(BiFunction<? super T, U, ? extends U> catamorphism, U identityValue) {
         return foldRight(identityValue, catamorphism);
     }
 
     /**
      * <code>foldRight</code> variant with swapped parameters.
      */
-    public <U> U foldRight(U identityValue, BiFunction<U, ? super T, ? extends U> catamorphism) {
+    public <U> U foldRight(U identityValue, BiFunction<? super T, U, ? extends U> catamorphism) {
         U foldedValue = identityValue;
         ListIterator<T> listIterator = this.values.listIterator(this.values.size());
         while (listIterator.hasPrevious()) {
-            foldedValue = catamorphism.apply(foldedValue, listIterator.previous());
+            foldedValue = catamorphism.apply(listIterator.previous(), foldedValue);
         }
         return foldedValue;
     }
