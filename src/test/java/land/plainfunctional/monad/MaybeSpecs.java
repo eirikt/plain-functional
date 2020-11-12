@@ -9,7 +9,7 @@ import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
 
-import land.plainfunctional.algebraicstructure.FreeMonoid;
+import land.plainfunctional.algebraicstructure.MonoidStructure;
 import land.plainfunctional.testdomain.TestFunctions;
 import land.plainfunctional.testdomain.vanillaecommerce.MutableCustomer;
 import land.plainfunctional.testdomain.vanillaecommerce.Person;
@@ -48,7 +48,7 @@ class MaybeSpecs {
         assertThatThrownBy(
             () -> just(null)
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
     }
 
     @Test
@@ -89,7 +89,7 @@ class MaybeSpecs {
             () -> of("someString").map((ignored) -> (Integer) null)
 
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
     }
 
     /**
@@ -275,7 +275,7 @@ class MaybeSpecs {
         Function<Integer, Integer> appliedCurriedPlusTwo = curriedPlus.apply(2);
 
         Maybe<Function<? super Integer, ? extends Integer>> maybeAppliedCurriedPlusTwo = just(appliedCurriedPlusTwo);
-        Maybe<Integer> maybeSum = (Maybe<Integer>) just(3).apply(maybeAppliedCurriedPlusTwo);
+        Maybe<Integer> maybeSum = just(3).apply(maybeAppliedCurriedPlusTwo);
 
         assertThat(maybeSum.tryGet()).isEqualTo(5);
     }
@@ -383,7 +383,7 @@ class MaybeSpecs {
                     .apply(just(nullFn.apply(100)))
                     .apply(just(curriedPlus.apply(4)))
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
 
         // And when doing 'map' of curried binary functions
         assertThatThrownBy(
@@ -394,7 +394,7 @@ class MaybeSpecs {
                     .apply(just(3).map(nullFn))
                     .apply(just(4).map(curriedPlus))
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
     }
 
     @Test
@@ -694,11 +694,11 @@ class MaybeSpecs {
         Maybe<Integer> justMinus13 = just(-13);
         Maybe<Integer> just7 = just(7);
 
-        LinkedHashSet<Maybe<String>> s = new LinkedHashSet<>();
-        s.add(just7.map(getGreaterThanTenInfo));
-        s.add(just7.map(getNegativeNumberInfo));
+        LinkedHashSet<Maybe<String>> set = new LinkedHashSet<>();
+        set.add(just7.map(getGreaterThanTenInfo));
+        set.add(just7.map(getNegativeNumberInfo));
 
-        BinaryOperator<Maybe<String>> o = (maybeString1, maybeString2) -> {
+        BinaryOperator<Maybe<String>> operation = (maybeString1, maybeString2) -> {
             if (maybeString2.isNothing()) {
                 return maybeString1;
             }
@@ -718,16 +718,16 @@ class MaybeSpecs {
             return Maybe.ofNonBlankString(curriedStringAppender.apply(string1).apply(string2));
         };
 
-        FreeMonoid<Maybe<String>> m = new FreeMonoid<>(s, o, just(""));
+        MonoidStructure<Maybe<String>> m = new MonoidStructure<>(set, operation, just(""));
 
         Maybe<String> maybeInfoString = m.fold();
         assertThat(maybeInfoString.isNothing()).isTrue();
 
-        s.clear();
-        s.add(justMinus13.map(getGreaterThanTenInfo));
-        s.add(justMinus13.map(getNegativeNumberInfo));
+        set.clear();
+        set.add(justMinus13.map(getGreaterThanTenInfo));
+        set.add(justMinus13.map(getNegativeNumberInfo));
 
-        m = new FreeMonoid<>(s, o, just(""));
+        m = new MonoidStructure<>(set, operation, just(""));
 
         maybeInfoString = m.fold();
         assertThat(maybeInfoString.isNothing()).isFalse();

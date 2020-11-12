@@ -36,8 +36,9 @@ import static org.apache.commons.lang3.builder.ToStringStyle.SHORT_PREFIX_STYLE;
  *
  * <p>
  * <i>NB! {@link AbstractProtectedValue} do allow <code>null</code>s.</i>
- * <code>null</code> is a "bottom" (⊥) type/value in Java.
- * It is a subclass of all types, and represents absence of any information.
+ * <code>null</code> is a "bottom" (⊥) value in Java.
+ * Bottom values are special values of the bottom type, which is a subclass of all types.
+ * <code>null</code> represents absence of any information.
  * </p>
  *
  * @param <T> The value type

@@ -1,6 +1,7 @@
 package land.plainfunctional.typeclass;
 
 import java.util.function.Function;
+
 import land.plainfunctional.util.Arguments;
 
 /**
@@ -106,11 +107,17 @@ public interface Monad<T> extends Applicative<T> {
      * @param <M>      Monad-covariant type (of the new monad)
      * @return the new monad
      */
+    //@SuppressWarnings("unchecked")
     default <V, M extends Monad<V>> M bind(Function<? super T, M> function) {
         Arguments.requireNotNull(function, "'function' argument cannot be null");
 
+        // TODO: Try:
+        //Functor<M> mappedMonad = map(function);
+        //return (M) ((M) mappedMonad).join();
+
         Functor<Monad<V>> mappedMonad = map(function);
         Monad<V> monad = (Monad<V>) mappedMonad;
+
         // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
         return (M) monad.join();
     }

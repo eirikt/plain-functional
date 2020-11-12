@@ -20,11 +20,6 @@ import land.plainfunctional.value.AbstractProtectedValue;
  * </p>
  *
  * <p>
- * The semantics of the "left" type value is that it will ignore any function parameters (morphisms) and just pass the current state along.
- * The "left" type will always represent a terminal value, there is no escape from it.
- * </p>
- *
- * <p>
  * Haskell type definition:<br><br>
  * <code>&nbsp;&nbsp;&nbsp;&nbsp;data Either a b = Left a | Right b</code>
  * </p>
@@ -36,6 +31,11 @@ import land.plainfunctional.value.AbstractProtectedValue;
  * making the {@link Either} monad a <code>polymorphic</code> type.
  * Instances of {@link Either} will either be a <code>Left</code> or a <code>Right</code> value.
  * {@link Either} is the arch-typical <i>sum type</i> (also known as <i>tagged union</i>, <i>disjoint union</i>, <i>variant</i>, <i>coproduct</i>).
+ * </p>
+ *
+ * <p>
+ * The semantics of the "left" type value is that it will ignore any function parameters (morphisms) and just pass the current state along.
+ * The "left" type will always represent a terminal value, there is no escape from it.
  * </p>
  *
  * <p>
@@ -244,7 +244,7 @@ public interface Either<L, R> extends Monad<R> {
 
         protected Right(R value) {
             super(value);
-            Arguments.requireNotNull(value, "Cannot create a 'Either.Right' from a 'null' value");
+            Arguments.requireNotNull(value, "Cannot create an 'Either.Right' from a 'null' value");
         }
 
         @Override

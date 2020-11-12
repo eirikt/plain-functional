@@ -34,7 +34,9 @@ import land.plainfunctional.util.Arguments;
  *
  * @param <T> The semigroup type, all values of this type belongs to the semigroup
  * @see <a href="https://en.wikipedia.org/wiki/Free_monoid">Free semigroup (Wikipedia)</a>
+ * @deprecated 'Free' mandates no (bounded) set of elements, does is not?
  */
+@Deprecated // 'Free' mandates no (bounded) set of elements, does it not?
 public class FreeSemigroup<T> extends Semigroup<T> {
 
     /**
@@ -83,13 +85,14 @@ public class FreeSemigroup<T> extends Semigroup<T> {
         return this.binaryOperation.apply(element1, element2);
     }
 
-    /**
+    /*
      * By providing a identity element, this semigroup can be promoted to a {@link FreeMonoid} instance.
      *
      * @param identityElement the monoid's identity element
      * @return a new 'FreeMonoid' instance
-     */
+     /
     public FreeMonoid<T> toFreeMonoid(T identityElement) {
         return new FreeMonoid<>((SortedSet<T>) this.set, this.binaryOperation, identityElement);
     }
+    */
 }

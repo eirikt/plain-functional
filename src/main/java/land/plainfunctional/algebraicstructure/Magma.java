@@ -13,12 +13,12 @@ import land.plainfunctional.util.Arguments;
  * A magma consists of a set of values equipped with a single binary operation that must by definition be <i>closed</i>.
  *
  * <p>
- * <i>Formally:</i> To qualify as a magma, the set 𝕊 and the binary operation • must satisfy the following requirement, known as the <i>magma-</i>, <i>totality-</i> or <i>closure axiom</i>:<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∀(𝓍,𝓎) ∈ 𝕊 ⇒ 𝓍•𝓎 ∈ 𝕊
+ * <i>Formally:</i> To qualify as a magma, the set 𝕊 and the binary operation, •, must satisfy the following requirement, known as the <i>magma-</i>, <i>totality-</i> or <i>closure axiom</i>:<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∀(𝓍,𝓎) ∈ 𝕊 ⇒ 𝓍 • 𝓎 ∈ 𝕊
  * </p>
  *
  * <p>
- * For all 𝓍,𝓎 ∈ 𝕊, the result of the operation 𝓍•𝓎 is (also) an element in 𝕊.
+ * For all 𝓍,𝓎 ∈ 𝕊, the result of the operation 𝓍 • 𝓎 is (also) an element in 𝕊.
  * </p>
  *
  * <p>
@@ -44,7 +44,7 @@ import land.plainfunctional.util.Arguments;
 public class Magma<T> {
 
     /**
-     * This magma's set.
+     * This magma's set of elements.
      */
     protected final Set<T> set;
 
@@ -76,7 +76,7 @@ public class Magma<T> {
     }
 
     /**
-     * Application of this magma's operation •<br>
+     * Application of this magma's operation, •<br>
      * This is an <i>endofunction</i>/<i>endomorphism</i>.
      *
      * <p>

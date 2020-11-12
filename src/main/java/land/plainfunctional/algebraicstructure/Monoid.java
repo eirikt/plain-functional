@@ -12,12 +12,12 @@ import land.plainfunctional.util.Arguments;
  * <p>
  * <i>Formally:</i> A monoid is a set 𝕊 with a closed, and associative binary operation, •,
  * which has an <i>identity element</i> <i>e</i> defined as:<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∃(<i>e</i>) ∈ 𝕊 ⇒ ∀(𝓍) ∈ 𝕊 ⇒ <i>e</i>•x = x•<i>e</i> = x
+ * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∃(<i>e</i>) ∈ 𝕊 ⇒ ∀(𝓍) ∈ 𝕊 ⇒ <i>e</i> • x = x • <i>e</i> = x
  * </p>
  *
  * <p>
  * There exists an element <i>e</i> in 𝕊 such that for every element 𝓍 in 𝕊,
- * the equation <i>e</i>•x = x•<i>e</i> = x hold.
+ * the equation <i>e</i> • x = x • <i>e</i> = x holds.
  * The element <i>e</i> is called an identity element.
  * </p>
  *

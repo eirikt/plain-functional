@@ -35,7 +35,9 @@ import static java.util.Collections.emptySet;
  *
  * @param <T> The magma type, all values of this type belongs to the magma
  * @see <a href="https://en.wikipedia.org/wiki/Magma_(algebra)#Free_magma">Free magma (Wikipedia)</a>
+ * @deprecated 'Free' mandates no (bounded) set of elements, does it not?
  */
+@Deprecated // 'Free' mandates no (bounded) set of elements, does it not?
 public class FreeMagma<T> extends Magma<T> {
 
     /**

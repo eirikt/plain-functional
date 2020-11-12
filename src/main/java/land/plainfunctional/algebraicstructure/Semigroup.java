@@ -6,14 +6,12 @@ import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.BinaryOperator;
 
-import land.plainfunctional.util.Arguments;
-
 /**
  * A <b>semigroup</b> is an <i>associative magma</i>.
  *
  * <p>
  * <i>Formally:</i> To qualify as a semigroup, the set 𝕊 and the binary operation • must be associative:<br>
- * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∀(𝓍,𝓎,𝓏) ∈ 𝕊 ⇒ (𝓍•𝓎)•𝓏 = 𝓍•(𝓎•𝓏)
+ * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∀(𝓍,𝓎,𝓏) ∈ 𝕊 ⇒ (𝓍 • 𝓎) • 𝓏 = 𝓍 • (𝓎 • 𝓏)
  * </p>
  *
  * <p>

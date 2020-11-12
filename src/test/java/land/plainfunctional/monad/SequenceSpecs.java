@@ -21,6 +21,7 @@ import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static land.plainfunctional.monad.Maybe.just;
+import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.monad.Sequence.withSequence;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -239,7 +240,7 @@ class SequenceSpecs {
         );
         assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
 
-        foldedSequence = sequence.toFreeMonoid(Person::append, new Person()).fold();
+        foldedSequence = sequence.toMonoid(Person::append, Person.identity()).fold();
         assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
 
 
@@ -248,7 +249,7 @@ class SequenceSpecs {
         //assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
 
         foldedSequence = sequence.foldRight(
-            new Person(),
+            Person.identity(),
             (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append)
         );
         assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
@@ -965,7 +966,7 @@ class SequenceSpecs {
         Function<Integer, Sequence<Boolean>> g = i -> Sequence.of(isEven(i));
 
         Sequence<Boolean> lhs = m.bind(f).bind(g);
-        Sequence<Boolean> rhs = m.bind(x -> f.apply(x).bind(g));
+        Sequence<Boolean> rhs = m.bind((a) -> f.apply(a).bind(g));
 
         assertThat(lhs).isNotSameAs(rhs);
         assertThat(lhs).isEqualTo(rhs);
@@ -1048,7 +1049,7 @@ class SequenceSpecs {
 
         assertThat(mappedSequence.isEmpty()).isTrue();
 
-        assertThat(mappedSequence.toFreeMonoid(Integer::sum, 0).fold())
+        assertThat(mappedSequence.toMonoid(Integer::sum, 0).fold())
             .isEqualTo(0);
     }
 
@@ -1068,7 +1069,7 @@ class SequenceSpecs {
         assertThat(mappedSequence.foldLeft(Integer::sum, 0))
             .isEqualTo(1 + 1 + 2 + 2 + 3 + 3);
 
-        assertThat(mappedSequence.toFreeMonoid(Integer::sum, 0).fold())
+        assertThat(mappedSequence.toMonoid(Integer::sum, 0).fold())
             .isEqualTo(1 + 2 + 3);
     }
 
@@ -1255,21 +1256,21 @@ class SequenceSpecs {
         int min = Sequence
             .of("one", "two", "three", "four")
             .map(String::length)
-            .toFreeMonoid(Integer.MAX_VALUE, Integer::min)
+            .toMonoid(Integer.MAX_VALUE, Integer::min)
             .fold();
         assertThat(min).isEqualTo(3);
 
         int max = Sequence
             .of("one", "two", "three", "four")
             .map(String::length)
-            .toFreeMonoid(Integer.MIN_VALUE, Integer::max)
+            .toMonoid(Integer.MIN_VALUE, Integer::max)
             .fold();
         assertThat(max).isEqualTo(5);
 
         int sum = Sequence
             .of("one", "two", "three", "four")
             .map(String::length)
-            .toFreeMonoid(0, Integer::sum)
+            .toMonoid(0, Integer::sum)
             .fold();
         // Monoid behaviour: Two 3 values => One 3 value
         assertThat(sum).isEqualTo(3 + 5 + 4);
@@ -1293,7 +1294,7 @@ class SequenceSpecs {
 
         String foldedString = Sequence
             .of("one", "two", "three", "four", "five", "six")
-            .toFreeMonoid(
+            .toMonoid(
                 "",
                 //(string1, string2) -> {
                 //    List<Character> filteredCharacterList = string2
@@ -1345,6 +1346,18 @@ class SequenceSpecs {
     }
 
     @Test
+    void shouldFilterNestedMonads() {
+        Predicate<Maybe<String>> justFourLetterWords = (maybeString) ->
+            maybeString.isNothing()
+                ? false
+                : maybeString.tryGet().length() == 4;
+
+        Sequence<Maybe<String>> seq = Sequence.of(just("one"), nothing(), just("two"), just("three"), just("four"), just("five"), nothing());
+
+        assertThat(seq.keep(justFourLetterWords).size()).isEqualTo(2);
+    }
+
+    @Test
     void shouldRemove() {
         Predicate<String> fourLetterWords = (string) -> string.length() == 4;
 
@@ -1368,8 +1381,7 @@ class SequenceSpecs {
     }
 
 
-    /*
-    // On-demand test
+    /* On-demand test
     @Test
     void shouldFoldPrimitives() {
         //int range = 0;
@@ -1444,7 +1456,7 @@ class SequenceSpecs {
         startGenerating = now();
         Sequence<Long> sequenceOfLongs = Sequence.of(listOfLongs);
         startProcessing = now();
-        sum = sequenceOfLongs.toFreeMonoid(Long::sum, 0L).fold();
+        sum = sequenceOfLongs.toMonoid(Long::sum, 0L).fold();
         System.out.println();
         //System.out.printf("Sum of int range: Plain functional Java, took %d ns%n", between(start, now()).toNanos());
         System.out.printf("Sum of int range: Plain functional Java (with ready-made array), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
@@ -1463,7 +1475,7 @@ class SequenceSpecs {
             //sequence = sequence.append(sequence.pure(i));
         }
         startProcessing = now();
-        sum = sequence.toFreeMonoid(Long::sum, 0L).fold();
+        sum = sequence.toMonoid(Long::sum, 0L).fold();
         System.out.println();
         System.out.printf("Sum of int range: Plain functional Java, generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
         System.out.printf("Sum of int range: Plain functional Java, processing took %d ms%n", between(startProcessing, now()).toMillis());
@@ -1492,7 +1504,7 @@ class SequenceSpecs {
             //sequenceOfMaybeLongs = sequenceOfMaybeLongs.append(sequenceOfMaybeLongs.pure(just(i)));
         }
         startProcessing = now();
-        sum = sequenceOfMaybeLongs.toFreeMonoid(
+        sum = sequenceOfMaybeLongs.toMonoid(
             //(maybeLong1, maybeLong2) -> just(maybeLong1.tryGet() + maybeLong2.tryGet())
             (maybeLong1, maybeLong2) -> maybeLong1.apply(maybeLong2.map(curriedLongSum)),
             just(0L)
@@ -1515,16 +1527,17 @@ class SequenceSpecs {
         };
         sequenceOfLongs = Sequence.of(intSupplier);
         startProcessing = now();
-        sum = sequenceOfLongs.toFreeMonoid(Long::sum, 0L).fold();
+        sum = sequenceOfLongs.toMonoid(Long::sum, 0L).fold();
         System.out.println();
         System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
         System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values), processing took %d ms%n", between(startProcessing, now()).toMillis());
         assertThat(sequenceOfLongs.size()).isEqualTo(range); // 1-based
         assertThat(sum).isEqualTo(rangeSum);
     }
+    */
 
 
-    // On-demand test
+    /* On-demand test
     @Test
     void shouldFoldProductTypes() {
         //int range = 3;
@@ -1536,7 +1549,7 @@ class SequenceSpecs {
             Runtime.getRuntime().totalMemory()
         );
 
-        //BinaryOperator<Payment> append = Payment::append;
+        BinaryOperator<Payment> append = Payment::append;
 
         Function<Payment, Function<Payment, Payment>> curriedAppend =
             (payment1) ->
@@ -1672,6 +1685,7 @@ class SequenceSpecs {
 
         // TODO: ...
         // "Sum" of Payments: Plain functional Java (with ready-made array)
+        // Nope
 
 
         // TODO: ...
@@ -1699,7 +1713,7 @@ class SequenceSpecs {
 
         startProcessing = now();
         payment = sequenceOfPayments
-            .toFreeMonoid(
+            .toMonoid(
                 Payment::append,
                 Payment.identity()
             )
@@ -1749,7 +1763,7 @@ class SequenceSpecs {
 
         startProcessing = now();
         payment = sequenceOfMaybePayments
-            .toFreeMonoid(
+            .toMonoid(
                 (maybePayment1, maybePayment2) -> maybePayment1.apply(maybePayment2.map(curriedAppend)),
                 just(Payment.identity())
             )

@@ -14,7 +14,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
-import land.plainfunctional.algebraicstructure.FreeMonoid;
+import land.plainfunctional.algebraicstructure.MonoidStructure;
 import land.plainfunctional.typeclass.Applicative;
 import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
@@ -153,7 +153,7 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
-    // Functor properties
+    // Functor
     ///////////////////////////////////////////////////////
 
     @Override
@@ -176,7 +176,7 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
-    // Applicative properties
+    // Applicative
     ///////////////////////////////////////////////////////
 
     //public Sequence<T> pure() {
@@ -226,7 +226,7 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
-    // Monad properties
+    // Monad
     ///////////////////////////////////////////////////////
 
     @Override
@@ -234,12 +234,12 @@ public class Sequence<T> implements Monad<T> {
         List<T> flattenedValues = new ArrayList<>(this.values.size());
         for (T element : this.values) {
             if (element instanceof Sequence) {
-                Sequence<?> wrappedElement = ((Sequence<?>) element);
+                Sequence<?> wrappedSequenceElement = ((Sequence<?>) element);
                 // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
                 // TODO: Well, also argue that this must be the case...
-                List<? extends T> _unsafeWrappedElement = (List<? extends T>) wrappedElement._unsafe();
+                List<? extends T> _unsafeWrappedElements = (List<? extends T>) wrappedSequenceElement._unsafe();
 
-                flattenedValues.addAll(_unsafeWrappedElement);
+                flattenedValues.addAll(_unsafeWrappedElements);
 
             } else {
                 flattenedValues.add(element);
@@ -250,7 +250,7 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
-    // Filter methods
+    // Filter
     ///////////////////////////////////////////////////////
 
     /**
@@ -290,7 +290,7 @@ public class Sequence<T> implements Monad<T> {
      *
      * <p>
      * So, <code>filter</code> finds and returns all elements that satisfies the given predicate condition.
-     * This value projection operation is also known as 'find' operation and the relational 'select' operation.
+     * This value projection operation is also known as 'find' and the relational 'select'.
      * </p>
      *
      * <p>
@@ -331,7 +331,7 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
-    // Fold methods
+    // Fold
     ///////////////////////////////////////////////////////
 
     /**
@@ -445,7 +445,7 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
-    // Append methods
+    // Append
     ///////////////////////////////////////////////////////
 
     /**
@@ -520,17 +520,22 @@ public class Sequence<T> implements Monad<T> {
      * @param identityElement identity element
      * @return a new monoid based on this sequence's elements (as the monoid set), and the given operation and identity element
      */
-    public FreeMonoid<T> toFreeMonoid(BinaryOperator<T> binaryOperation, T identityElement) {
-        return toFreeMonoid(identityElement, binaryOperation);
+    public MonoidStructure<T> toMonoid(BinaryOperator<T> binaryOperation, T identityElement) {
+        return toMonoid(
+            identityElement,
+            binaryOperation
+        );
     }
 
     /**
      * <code>toFreeMonoid</code> variant with swapped parameters.
      */
-    public FreeMonoid<T> toFreeMonoid(T identityElement, BinaryOperator<T> binaryOperation) {
-        LinkedHashSet<T> associativeSet = new LinkedHashSet<>(this.values);
-
-        return new FreeMonoid<>(associativeSet, binaryOperation, identityElement);
+    public MonoidStructure<T> toMonoid(T identityElement, BinaryOperator<T> binaryOperation) {
+        return new MonoidStructure<>(
+            new LinkedHashSet<>(this.values),
+            binaryOperation,
+            identityElement
+        );
     }
 
 

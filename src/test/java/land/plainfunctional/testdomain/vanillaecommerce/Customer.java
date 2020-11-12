@@ -8,6 +8,8 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 // TODO: Make immutable
 public class Customer extends Person implements Cloneable {
 
+    public static final Customer IDENTITY = new Customer();
+
     public OffsetDateTime membershipDate;
 
     public String customerId;             // Username (identifies the user)

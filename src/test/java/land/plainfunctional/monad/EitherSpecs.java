@@ -100,7 +100,7 @@ class EitherSpecs {
         assertThatThrownBy(
             () -> right(null)
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Either.Right' from a 'null' value");
+         .hasMessageContaining("Cannot create an 'Either.Right' from a 'null' value");
     }
 
     @Test

@@ -8,6 +8,7 @@ import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
 import land.plainfunctional.value.AbstractProtectedValue;
 
+import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 /**
@@ -16,11 +17,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * <b>
  * The value may or may not be present.
  * </b>
- * </p>
- *
- * <p>
- * The semantics of the "nothing" type value is that it will ignore any function parameters (morphisms) and just pass the current state along.
- * The "nothing" type will always represent a terminal value, there is no escape from it.
  * </p>
  *
  * <p>
@@ -36,6 +32,11 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * making the {@link Maybe} monad a <code>polymorphic</code> type.
  * Instances of {@link Maybe} will either be a <code>Nothing</code> or a <code>Just</code> value,
  * so {@link Maybe} is a <i>sum type</i> (also known as <i>tagged union</i>, <i>disjoint union</i>, <i>variant</i>, <i>coproduct</i>).
+ * </p>
+ *
+ * <p>
+ * The semantics of the "nothing" type value is that it will ignore any function parameters (morphisms) and just pass the current state along.
+ * The "nothing" type will always represent a terminal value, there is no escape from it.
  * </p>
  *
  * <p>
@@ -132,7 +133,10 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      * <code>Just</code> data constructor.
      */
     public static <T> Maybe<T> just(T value) {
-        Arguments.requireNotNull(value, "Cannot create a 'Maybe.Just' from a 'null' value");
+        // TODO: Is this too strict? It deviates from Vavr's way of doing it, which allows 'null' for its 'Option.some' data constructor
+        // => So far, it works as a fail-fast policy...
+        Arguments.requireNotNull(value, "Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
+
         return new Maybe<>(value);
     }
 
@@ -160,6 +164,91 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      */
     public boolean isNothing() {
         return this.value.isLeft();
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Functor
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Override
+    public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
+        Arguments.requireNotNull(function, "'function' argument cannot be null");
+        //return isNothing()
+        //    ? nothing()
+        //    : just(function.apply(this.value.tryGet()));
+
+        // It is also possible to implement homomorphism using a catamorphism.
+        // Because here, the "catamorphism" is accidentally equal to a regular homomorphism...
+        return fold(
+            Maybe::nothing,
+            (ignored) -> just(function.apply(this.value.tryGet()))
+        );
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Applicative functor
+    ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * {@inheritDoc}
+     *
+     * As no {@link Maybe} context yet exists, we are free to use either of the data constructors.
+     */
+    @Override
+    public Maybe<T> pure(T value) {
+        return of(value);
+    }
+
+    @Override
+    public <V> Maybe<V> apply(Applicative<Function<? super T, ? extends V>> functionInContext) {
+        Arguments.requireNotNull(functionInContext, "'functionInContext' argument cannot be null");
+
+        // TODO: May throw 'ClassCastException'! (See inherited JavaDoc) Any chance of mitigating this - with Java's type system? (Lacking higher kinded types)
+        Maybe<Function<? super T, ? extends V>> maybeFunction =
+            (Maybe<Function<? super T, ? extends V>>) functionInContext;
+
+        return maybeFunction.isNothing()
+            ? (Maybe<V>) functionInContext
+            : just(maybeFunction.tryGet().apply(this.value.tryGet())
+        );
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Monad
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Override
+    public Maybe<T> join() {
+        if (this.value instanceof Either.Right<?, ?>) {
+            if (this.value.tryGet() instanceof Maybe<?>) {
+                // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
+                // TODO: Well, also argue that this must be the case...
+                return (Maybe<T>) this.value.tryGet();
+            }
+            // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
+            // TODO: Well, also argue that this must be the case...
+            return (Maybe<T>) this.value;
+        }
+        return nothing();
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Fold
+    ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * @return a simple string representation of this {@link Maybe}
+     */
+    public String toStringMaybe() {
+        return fold(
+            () -> "Nothing",
+            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
+            (ignored) -> format("Just(%s)", this.value.tryGet())
+        );
     }
 
     /**
@@ -261,74 +350,5 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      */
     public <U> U fold(Supplier<U> onNothing, Function<? super T, ? extends U> onJust) {
         return this.value.fold(onNothing, onJust);
-    }
-
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Functor
-    ///////////////////////////////////////////////////////////////////////////
-
-    @Override
-    public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
-        Arguments.requireNotNull(function, "'function' argument cannot be null");
-        //return isNothing()
-        //    ? nothing()
-        //    : just(function.apply(this.value.tryGet()));
-
-        // It is also possible to implement homomorphism using a catamorphism.
-        // Because here, the "catamorphism" is accidentally equal to a regular homomorphism...
-        return fold(
-            Maybe::nothing,
-            (ignored) -> just(function.apply(this.value.tryGet()))
-        );
-    }
-
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Applicative functor
-    ///////////////////////////////////////////////////////////////////////////
-
-    /**
-     * {@inheritDoc}
-     *
-     * As no {@link Maybe} context yet exists, we are free to use either of the data constructors.
-     */
-    @Override
-    public Maybe<T> pure(T value) {
-        return of(value);
-    }
-
-    @Override
-    public <V> Maybe<V> apply(Applicative<Function<? super T, ? extends V>> functionInContext) {
-        Arguments.requireNotNull(functionInContext, "'functionInContext' argument cannot be null");
-
-        // TODO: May throw 'ClassCastException'! (See inherited JavaDoc) Any chance of mitigating this - with Java's type system? (Lacking higher kinded types)
-        Maybe<Function<? super T, ? extends V>> maybeFunction =
-            (Maybe<Function<? super T, ? extends V>>) functionInContext;
-
-        return maybeFunction.isNothing()
-            ? (Maybe<V>) functionInContext
-            : just(maybeFunction.tryGet().apply(this.value.tryGet())
-        );
-    }
-
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Monad
-    ///////////////////////////////////////////////////////////////////////////
-
-    @Override
-    public Maybe<T> join() {
-        if (this.value instanceof Either.Right<?, ?>) {
-            if (this.value.tryGet() instanceof Maybe<?>) {
-                // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
-                // TODO: Well, also argue that this must be the case...
-                return (Maybe<T>) this.value.tryGet();
-            }
-            // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
-            // TODO: Well, also argue that this must be the case...
-            return (Maybe<T>) this.value;
-        }
-        return nothing();
     }
 }

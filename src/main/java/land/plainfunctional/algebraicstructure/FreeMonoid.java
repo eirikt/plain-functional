@@ -1,13 +1,37 @@
 package land.plainfunctional.algebraicstructure;
 
 import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import land.plainfunctional.util.Arguments;
 
 /**
- * {@inheritDoc}
+ * A <b>monoid</b> is a <i>semigroup with an identity element</i>.
+ *
+ * <p>
+ * <i>Formally:</i> A monoid is a set 𝕊 with a closed, and associative binary operation, •,
+ * which has an <i>identity element</i> <i>e</i> defined as:<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∃(<i>e</i>) ∈ 𝕊 ⇒ ∀(𝓍) ∈ 𝕊 ⇒ <i>e</i> • x = x • <i>e</i> = x
+ * </p>
+ *
+ * <p>
+ * There exists an element <i>e</i> in 𝕊 such that for every element 𝓍 in 𝕊,
+ * the equation <i>e</i> • x = x • <i>e</i> = x holds.
+ * The element <i>e</i> is called an identity element.
+ * </p>
+ *
+ * <p>
+ * The identity element/identity value is also called "the neutral element".
+ * </p>
+ *
+ * <p>
+ * With the identity element and the associative operation, we have all we need for "collapsing the monoid";
+ * Reducing all the elements into one single element&mdash;<i>folding</i>.
+ * </p>
  *
  * <p>...</p>
  *
@@ -33,38 +57,63 @@ import land.plainfunctional.util.Arguments;
  * </p>
  *
  * @param <T> The monoid type, all values of this type belongs to the monoid
+ * @see <a href="https://en.wikipedia.org/wiki/Monoid">Monoid (Wikipedia)</a>
+ * @see <a href="https://en.wikipedia.org/wiki/Identity_element">Identity element (Wikipedia)</a>
  * @see <a href="https://en.wikipedia.org/wiki/Free_monoid">Free monoid (Wikipedia)</a>
  */
-public class FreeMonoid<T> extends Monoid<T> {
+public class FreeMonoid<T> {
 
     /**
-     * @param linkedHashSet   set of elements which preserves its element insertion order when iterated
+     * This monoids's binary operation.
+     *
+     * <p>
+     * The totality/closure property which the binary operation also must inhibit,
+     * is enforced via the single-parametric {@link BinaryOperator} class,
+     * in addition to constraints defined in the <code>append</code> method.
+     * </p>
+     */
+    public final BinaryOperator<T> binaryOperation;
+
+    /**
+     * This monoid's identity element.
+     */
+    public final T identityElement;
+
+    /**
      * @param binaryOperation associative and closed binary operation
      * @param identityElement identity element
      */
     public FreeMonoid(
-        LinkedHashSet<T> linkedHashSet,
         BinaryOperator<T> binaryOperation,
         T identityElement
     ) {
-        super(linkedHashSet, binaryOperation, identityElement);
+        Arguments.requireNotNull(binaryOperation, "A monoid must have a binary operation");
+        Arguments.requireNotNull(identityElement, "A monoid must have an identity element - a neutral element");
+        this.binaryOperation = binaryOperation;
+        this.identityElement = identityElement;
     }
 
     /**
-     * @param sortedSet       set of elements which iteration order is defined by its 'Comparator' member
-     * @param binaryOperation associative and closed binary operation
-     * @param identityElement identity element
+     * @return a deferred ("nullary"/constant function) version of this monoid's identity elements
      */
-    public FreeMonoid(
-        SortedSet<T> sortedSet,
-        BinaryOperator<T> binaryOperation,
-        T identityElement
-    ) {
-        super(sortedSet, binaryOperation, identityElement);
+    public Supplier<T> deferredIdentity() {
+        return
+            () ->
+                this.identityElement;
     }
 
     /**
-     * Application of this monoid's operation •<br>
+     * @return a curried version of this monoid's associative, closed, binary operation
+     */
+    public Function<T, Function<T, T>> curriedBinaryOperation() {
+        return
+            (arg1) ->
+                (arg2) ->
+                    this.binaryOperation.apply(arg1, arg2);
+    }
+
+    /**
+     * Application of this monoid's operation, •<br>
      * This is an <i>endofunction</i>/<i>endomorphism</i>.
      *
      * <p>
@@ -81,7 +130,6 @@ public class FreeMonoid<T> extends Monoid<T> {
      * @throws IllegalArgumentException if one or both of the arguments are not elements of this monoid
      * @throws IllegalStateException    if the result of the applied operation is not element of this monoid
      */
-    @Override
     public T append(T element1, T element2) {
         Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");
         Arguments.requireNotNull(element2, "'element2' argument cannot be 'null'");
@@ -133,13 +181,53 @@ public class FreeMonoid<T> extends Monoid<T> {
      * Do notice that the first 'append' parameter acts as the accumulated value while folding.
      * </p>
      *
+     * @param enumeratedSet set of enumerated elements
      * @return the folded value
      */
-    public T fold() {
-        T foldedValue = this.identityElement;
-        for (T value : this.set) {
-            foldedValue = append(foldedValue, value);
+    //public T fold(SortedSet<T> set) {
+    //    T foldedValue = this.identityElement;
+    //    for (T value : set) {
+    //        foldedValue = append(foldedValue, value);
+    //    }
+    //    return foldedValue;
+    //}
+    //public T fold(LinkedHashSet<T> set) {
+    //    T foldedValue = this.identityElement;
+    //    for (T value : set) {
+    //        foldedValue = append(foldedValue, value);
+    //    }
+    //    return foldedValue;
+    //}
+    //public T fold(Set<T> set) {
+    //    if (!(set instanceof SortedSet || set instanceof LinkedHashSet)) {
+    //        throw new IllegalArgumentException("The set argument must be strictly enumerated");
+    //    }
+    //    T foldedValue = this.identityElement;
+    //    for (T value : set) {
+    //        foldedValue = append(foldedValue, value);
+    //    }
+    //    return foldedValue;
+    //}
+    public T fold(Set<T> enumeratedSet) {
+        return toMonoidStructure(enumeratedSet).fold();
+    }
+
+    /**
+     * By providing an enumerated set (ensuring the binary operation's associativity requirement),
+     * this free monoid can be promoted to a free monoid (only limited by the data type),
+     * plus bounded subset of the data type as the monoid set.
+     *
+     * @param enumeratedSet set of enumerated elements
+     * @return a free monoid including a bounded subset of the data type as the monoid set
+     */
+    @SuppressWarnings("unchecked")
+    public MonoidStructure<T> toMonoidStructure(Set enumeratedSet) {
+        if (enumeratedSet instanceof LinkedHashSet) {
+            return new MonoidStructure<>((LinkedHashSet<T>) enumeratedSet, this.binaryOperation, this.identityElement);
         }
-        return foldedValue;
+        if (enumeratedSet instanceof SortedSet) {
+            return new MonoidStructure<>((SortedSet<T>) enumeratedSet, this.binaryOperation, this.identityElement);
+        }
+        throw new IllegalArgumentException("The set argument must be strictly enumerated");
     }
 }
