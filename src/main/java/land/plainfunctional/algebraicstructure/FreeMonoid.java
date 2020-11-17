@@ -121,14 +121,13 @@ public class FreeMonoid<T> {
      * NB! Partial method:<br>
      * The parameter values as well as the result must be actual elements of this magma.
      * </i><br>
-     * Violations of this rule will result in a <i>bottom</i> value&mdash;here runtime exceptions.
+     * Violations of this rule will result in a <i>bottom</i> value&mdash;here <code>null</code> or runtime exceptions.
      * </p>
      *
      * @param element1 a monoid element
      * @param element2 a monoid element
-     * @return a resulting magma element, or a bottom value if the result is not an element of this monoid
+     * @return a resulting magma element, or a bottom value if one of the arguments or the result is not an element of this monoid
      * @throws IllegalArgumentException if one or both of the arguments are not elements of this monoid
-     * @throws IllegalStateException    if the result of the applied operation is not element of this monoid
      */
     public T append(T element1, T element2) {
         Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");
@@ -219,15 +218,18 @@ public class FreeMonoid<T> {
      *
      * @param enumeratedSet set of enumerated elements
      * @return a free monoid including a bounded subset of the data type as the monoid set
+     * @throws IllegalArgumentException if the given 'enumeratedSet' parameter is not a {@link LinkedHashSet} or {@link SortedSet} instance
      */
-    @SuppressWarnings("unchecked")
-    public MonoidStructure<T> toMonoidStructure(Set enumeratedSet) {
+    public MonoidStructure<T> toMonoidStructure(Set<T> enumeratedSet) {
+        if (this instanceof MonoidStructure<?>) {
+            return (MonoidStructure<T>) this;
+        }
         if (enumeratedSet instanceof LinkedHashSet) {
             return new MonoidStructure<>((LinkedHashSet<T>) enumeratedSet, this.binaryOperation, this.identityElement);
         }
         if (enumeratedSet instanceof SortedSet) {
             return new MonoidStructure<>((SortedSet<T>) enumeratedSet, this.binaryOperation, this.identityElement);
         }
-        throw new IllegalArgumentException("The set argument must be strictly enumerated");
+        throw new IllegalArgumentException("The given 'enumeratedSet' argument must be strictly enumerated");
     }
 }

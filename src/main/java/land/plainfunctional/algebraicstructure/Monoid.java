@@ -70,4 +70,13 @@ public class Monoid<T> extends Semigroup<T> {
         Arguments.requireNotNull(identityElement, "A monoid must have an identity element - a neutral element");
         this.identityElement = identityElement;
     }
+
+    /**
+     * By ignoring this monoid's given set of elements, and instead using the type, this monoid can be extended to a {@link FreeMonoid} instance.
+     *
+     * @return a new 'FreeMonoid' instance
+     */
+    public FreeMonoid<T> toFreeMonoid() {
+        return new FreeMonoid<>(this.binaryOperation, this.identityElement);
+    }
 }

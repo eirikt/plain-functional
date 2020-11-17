@@ -84,12 +84,12 @@ public class Magma<T> {
      * NB! Partial method:<br>
      * The parameter values as well as the result must be actual elements of this magma.
      * </i><br>
-     * Violations of this rule will result in a <i>bottom</i> value&mdash;here runtime exceptions.
+     * Violations of this rule will result in a <i>bottom</i> value&mdash;here <code>null</code> or runtime exceptions.
      * </p>
      *
      * @param element1 a magma element
      * @param element2 a magma element
-     * @return a resulting magma element, or a bottom value if the result is not an element of this magma
+     * @return a resulting magma element, or a bottom value if one of the arguments or the result is not an element of this monoid
      * @throws IllegalArgumentException if one or both of the arguments are not elements of this magma
      * @throws IllegalStateException    if the result of the applied operation is not an element of this magma
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>

@@ -72,6 +72,7 @@ public class FreeSemigroup<T> extends Semigroup<T> {
      * @param element2 a semigroup element
      * @return a resulting semigroup element, or a bottom value if the result is not an element of this magma
      * @throws IllegalArgumentException if the element values are equal
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
      */
     @Override
     public T append(T element1, T element2) {
@@ -85,14 +86,13 @@ public class FreeSemigroup<T> extends Semigroup<T> {
         return this.binaryOperation.apply(element1, element2);
     }
 
-    /*
+    /**
      * By providing a identity element, this semigroup can be promoted to a {@link FreeMonoid} instance.
      *
      * @param identityElement the monoid's identity element
      * @return a new 'FreeMonoid' instance
-     /
+     */
     public FreeMonoid<T> toFreeMonoid(T identityElement) {
-        return new FreeMonoid<>((SortedSet<T>) this.set, this.binaryOperation, identityElement);
+        return new FreeMonoid<>(this.binaryOperation, identityElement);
     }
-    */
 }
