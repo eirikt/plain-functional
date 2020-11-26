@@ -35,31 +35,9 @@ import land.plainfunctional.util.Arguments;
 public interface Monad<T> extends Applicative<T> {
 
     /**
-     * "Flattens"/"collapses" a "layered"/"wrapped" monad.
-     *
-     * <p>
-     * "Plain functionally" (Haskell-style), this function is defined as:
-     * </p>
-     *
-     * <p>
-     * <code>
-     * &nbsp;&nbsp;&nbsp;&nbsp;join :: Monad m =&gt; m (m a) -&gt; m a
-     * </code>
-     * </p>
-     *
-     * <p>
-     * If not documented otherwise, the function will flatten the data structure recursively&mdash;
-     * meaning that the monad layers may be arbitrary deep.
-     * </p>
-     *
-     * @return the joined monad
-     */
-    Monad<T> join();
-
-    /**
      * Alias of <code>bind</code>.
      */
-    default <V> Monad<V> then(Function<? super T, ? extends Monad<V>> function) {
+    default <V, M extends Monad<V>> M then(Function<? super T, M> function) {
         return bind(function);
     }
 
@@ -121,4 +99,26 @@ public interface Monad<T> extends Applicative<T> {
         // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
         return (M) monad.join();
     }
+
+    /**
+     * "Flattens"/"collapses" a "layered"/"wrapped" monad.
+     *
+     * <p>
+     * "Plain functionally" (Haskell-style), this function is defined as:
+     * </p>
+     *
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;join :: Monad m =&gt; m (m a) -&gt; m a
+     * </code>
+     * </p>
+     *
+     * <p>
+     * If not documented otherwise, the function will flatten the data structure recursively&mdash;
+     * meaning that the monad layers may be arbitrary deep.
+     * </p>
+     *
+     * @return the joined monad
+     */
+    Monad<T> join();
 }
