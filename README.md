@@ -7,24 +7,25 @@ _NB! Still work in progress._)
 
 ---
 
-After many years using object-oriented programming languages (OOP) in medium/large projects,
-I am not happy with the current state of affairs.
-Problematic properties of OOP are things like concurrency (shared mutable state), reuse, and scalability in general.
-This little library is one of my own stepping stones, going from the "imperative world" to the "functional, declarative world".
+The introduction of [function types](https://en.wikipedia.org/wiki/Function_type) in [Java 8](https://en.wikipedia.org/wiki/Java_version_history#Java_SE_8) made it possible to create [higher-order functions](https://en.wikipedia.org/wiki/Higher-order_function), and apply concepts from [functional programming](https://en.wikipedia.org/wiki/Functional_programming) in Java the language.
 
-So why do this in Java?
-Well, it's just the programming language I have mostly used the last years.
-When possible, you should always try out new stuff in a familiar setting.
-The differences stand out more clearly then.
+The usual way of achieving this is by using [lambda expressions](https://en.wikipedia.org/wiki/Anonymous_function), the [Java Stream API](https://www.baeldung.com/java-8-streams), and/or using a third-party library like [Vavr](https://www.vavr.io).
 
-This library will strive to follow concepts and terminology from [Haskell](https://www.haskell.org).
-Haskell has a strong mathematical foundation, hence the name "plain functional".
-Also, that is why (the good ol') Java 8 is used in this library&mdash;as we only need Java's [function type](https://en.wikipedia.org/wiki/Function_type).
+This library is yet another of those third-party libraries...
+So, isn't this just another blatant example of [not-invented-here](https://en.wikipedia.org/wiki/Not_invented_here) thinking ;-)
+Well, this library is first and foremost a personal educational project.
+I will strive to follow concepts and terminology from [Haskell](https://www.haskell.org).
+Haskell has a strong mathematical foundation, hence the name "_Plain functional_".
+This, again, is for the ultimate goal of precision and preciseness when declaring logic.
+_Plain functional_ will prioritize ease-of-use and readability first&mdash;and performance later.
+Who knows, maybe this library develops into something useful in the future.
+
+---
 
 The state of this little library is:
-<b>_Very alpha_</b>&mdash;<b>don't use it</b>, use [Vavr](https://www.vavr.io) (or something in that ballpark) instead.
-But who knows, maybe this library develops into something that might be recommended in the future.
-(Either way, this library will not be set to anywhere near v1.0 before it is used in production for many months!)
+<b>_Very alpha_</b>&mdash;<b>don't use it for anything serious</b>, use [Vavr](https://www.vavr.io) (or something in that ballpark) instead.
+
+(Either way, this library will not be set to anywhere near version 1.0 before it is used in production for many months, in more than one application! If it ever will.)
 
 ---
 
@@ -32,7 +33,7 @@ But who knows, maybe this library develops into something that might be recommen
 
 [Javadoc](https://plain-functional-javadoc.vercel.app)
 
-Includes all library documentation for the time being.
+The Javadoc is all there is of documentation for the time being.
 
 ---
 
@@ -56,4 +57,4 @@ Then open `/target/site/apidocs/index.html`
 
 ### License
 
-[MIT License](file://LICENCE.txt)
+[MIT License](file://LICENSE.txt)
