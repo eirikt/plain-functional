@@ -58,7 +58,7 @@ public interface Applicative<T> extends Functor<T> {
      *
      * <p>
      * <i>Observation</i>:<br>
-     * <code>apply</code> feels like an <code>append</code> function of algebraic structures (to be added in this library in the near future).
+     * <code>apply</code> feels like an <code>append</code> function of algebraic structures.
      * While <code>map</code> is suitable for composing unary functions transforming the functor value,
      * <code>apply</code> seems to be suitable for composing (curried) binary functions.
      * This bridges a gap between typeclasses (e.g. Functors and Monads) and algebraic structures (e.g. Sets, Semigroups, Monoids, Groups, Rings, Lattices).

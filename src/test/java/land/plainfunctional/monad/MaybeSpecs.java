@@ -677,7 +677,11 @@ class MaybeSpecs {
     @Test
     void shouldDoValidationAndStuffLikeThat_4() {
         Function<String, Function<String, String>> curriedStringAppender =
-            (string1) -> (string2) -> isBlank(string2) ? string1 : string1 + ", " + string2;
+            (string1) ->
+                (string2) ->
+                    isBlank(string2)
+                        ? string1
+                        : string1 + ", " + string2;
 
         Function<Integer, String> getNegativeNumberInfo =
             (integer) ->

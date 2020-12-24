@@ -9,7 +9,7 @@ import land.plainfunctional.util.Arguments;
 import land.plainfunctional.value.AbstractProtectedValue;
 
 import static java.lang.String.format;
-import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 /**
  * <p>
@@ -90,7 +90,18 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     }
 
     /**
-     * Trusted factory method.
+     * Specialized string factory method, requiring a non-blank string to be a 'Just'.
+     * (As no {@link Maybe} yet exists, we are free to use either of the data constructors.)
+     *
+     * @param stringValue The string to be put into this {@link Maybe} functor
+     * @return A 'Nothing' if the given string is blank, otherwise 'Just'
+     */
+    public static Maybe<String> ofNonBlankString(String stringValue) {
+        return of(trimToNull(stringValue));
+    }
+
+    /**
+     * Factory method.
      * (As no {@link Maybe} yet exists, we are free to use either of the data constructors.)
      *
      * @param value The value to be put into this {@link Maybe} functor
@@ -100,12 +111,6 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
         return value == null
             ? nothing()
             : just(value);
-    }
-
-    public static Maybe<String> ofNonBlankString(String stringValue) {
-        return isBlank(stringValue)
-            ? nothing()
-            : just(stringValue);
     }
 
 
@@ -348,7 +353,10 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      * @param <U>       The type of the folded/returning value
      * @return the folded value
      */
-    public <U> U fold(Supplier<U> onNothing, Function<? super T, ? extends U> onJust) {
+    public <U> U fold(
+        Supplier<U> onNothing,
+        Function<? super T, ? extends U> onJust
+    ) {
         return this.value.fold(onNothing, onJust);
     }
 }

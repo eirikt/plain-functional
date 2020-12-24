@@ -14,6 +14,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
+import land.plainfunctional.algebraicstructure.FreeMonoid;
 import land.plainfunctional.algebraicstructure.MonoidStructure;
 import land.plainfunctional.typeclass.Applicative;
 import land.plainfunctional.typeclass.Monad;
@@ -368,6 +369,50 @@ public class Sequence<T> implements Monad<T> {
      * Do notice that the <i>first</i> 'append' parameter acts as the accumulated value while folding.
      * </p>
      *
+     * @param monoid The same-type monoid used for folding this sequence
+     * @return the folded value
+     */
+    public T foldLeft(FreeMonoid<T> monoid) {
+        return foldLeft(
+            monoid.identityElement,
+            monoid.binaryOperation
+        );
+    }
+
+    /**
+     * <p>
+     * To <i>fold</i> a value means creating a new representation of it.
+     * </p>
+     *
+     * <p>
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
+     * </p>
+     *
+     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>:
+     * A binary function <code>b -&gt; a -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>
+     * "Left fold"/"Fold-left" starts with the identity value,
+     * and appends/adds the left-most (first) element in this sequence,
+     * and then appends/adds the rest of the elements "going to the right".
+     * Do notice that the <i>first</i> 'append' parameter acts as the accumulated value while folding.
+     * </p>
+     *
      * @param identityValue The identity value, acting as the initial value of this fold operation
      * @param catamorphism  The fold function
      * @param <U>           The type of the folded/returning value
@@ -386,6 +431,50 @@ public class Sequence<T> implements Monad<T> {
             foldedValue = catamorphism.apply(foldedValue, value);
         }
         return foldedValue;
+    }
+
+    /**
+     * <p>
+     * To <i>fold</i> a value means creating a new representation of it.
+     * </p>
+     *
+     * <p>
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
+     * </p>
+     *
+     * "Plain functionally" (Haskell-style), "foldright" (<code>foldr</code>) is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldr :: (a -&gt; b -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>:
+     * A binary function <code>a -&gt; b -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>
+     * "Right fold"/"Fold-right" starts with the identity value,
+     * and appends/adds the right-most (first) element in this sequence,
+     * and then appends/adds the rest of the elements "going to the left".
+     * Do notice that the <i>second</i> 'append' parameter acts as the accumulated value while folding.
+     * </p>
+     *
+     * @param monoid The same-type monoid used for folding this sequence
+     * @return the folded value
+     */
+    public T foldRight(FreeMonoid<T> monoid) {
+        return foldRight(
+            monoid.identityElement,
+            monoid.binaryOperation
+        );
     }
 
     /**
@@ -498,7 +587,7 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
-    // "Re-wrappings"
+    // Transformations
     ///////////////////////////////////////////////////////
 
     /**
@@ -516,6 +605,17 @@ public class Sequence<T> implements Monad<T> {
     }
 
     /**
+     * @param freeMonoid free monoid (with a closed, associative binary operation and an identity element)
+     * @return a new monoid structure based on this sequence's elements (as the monoid set), and the given free monoid
+     */
+    public MonoidStructure<T> toMonoid(FreeMonoid<T> freeMonoid) {
+        return toMonoid(
+            freeMonoid.binaryOperation,
+            freeMonoid.identityElement
+        );
+    }
+
+    /**
      * @param binaryOperation associative and closed binary operation
      * @param identityElement identity element
      * @return a new monoid based on this sequence's elements (as the monoid set), and the given operation and identity element
@@ -528,7 +628,7 @@ public class Sequence<T> implements Monad<T> {
     }
 
     /**
-     * <code>toFreeMonoid</code> variant with swapped parameters.
+     * <code>toMonoid</code> variant with swapped parameters.
      */
     public MonoidStructure<T> toMonoid(T identityElement, BinaryOperator<T> binaryOperation) {
         return new MonoidStructure<>(

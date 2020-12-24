@@ -6,7 +6,7 @@
 
     <groupId>land.plainfunctional</groupId>
     <artifactId>plain-functional</artifactId>
-    <version>0.2.1-SNAPSHOT</version>
+    <version>0.2.2</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -31,7 +31,7 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
-            <version>3.18.0</version>
+            <version>3.18.1</version>
             <scope>test</scope>
         </dependency>
 

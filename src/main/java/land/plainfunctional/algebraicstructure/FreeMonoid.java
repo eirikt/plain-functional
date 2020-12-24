@@ -7,6 +7,7 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import land.plainfunctional.monad.Reader;
 import land.plainfunctional.util.Arguments;
 
 /**
@@ -183,30 +184,6 @@ public class FreeMonoid<T> {
      * @param enumeratedSet set of enumerated elements
      * @return the folded value
      */
-    //public T fold(SortedSet<T> set) {
-    //    T foldedValue = this.identityElement;
-    //    for (T value : set) {
-    //        foldedValue = append(foldedValue, value);
-    //    }
-    //    return foldedValue;
-    //}
-    //public T fold(LinkedHashSet<T> set) {
-    //    T foldedValue = this.identityElement;
-    //    for (T value : set) {
-    //        foldedValue = append(foldedValue, value);
-    //    }
-    //    return foldedValue;
-    //}
-    //public T fold(Set<T> set) {
-    //    if (!(set instanceof SortedSet || set instanceof LinkedHashSet)) {
-    //        throw new IllegalArgumentException("The set argument must be strictly enumerated");
-    //    }
-    //    T foldedValue = this.identityElement;
-    //    for (T value : set) {
-    //        foldedValue = append(foldedValue, value);
-    //    }
-    //    return foldedValue;
-    //}
     public T fold(Set<T> enumeratedSet) {
         return toMonoidStructure(enumeratedSet).fold();
     }
@@ -231,5 +208,12 @@ public class FreeMonoid<T> {
             return new MonoidStructure<>((SortedSet<T>) enumeratedSet, this.binaryOperation, this.identityElement);
         }
         throw new IllegalArgumentException("The given 'enumeratedSet' argument must be strictly enumerated");
+    }
+
+    /**
+     * @return a {@link Reader} version of this monoid's identity element
+     */
+    public Reader<T> toReaderIdentity() {
+        return Reader.startingWith(this.identityElement);
     }
 }

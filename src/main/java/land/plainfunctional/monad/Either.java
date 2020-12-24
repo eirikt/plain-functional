@@ -138,7 +138,10 @@ public interface Either<L, R> extends Monad<R> {
      * @param <U>     The type of the folded/returning value
      * @return the folded value
      */
-    <U> U fold(Supplier<U> onLeft, Function<? super R, ? extends U> onRight);
+    <U> U fold(
+        Supplier<U> onLeft,
+        Function<? super R, ? extends U> onRight
+    );
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -214,7 +217,10 @@ public interface Either<L, R> extends Monad<R> {
         }
 
         @Override
-        public <U> U fold(Supplier<U> defaultValueSupplier, Function<? super R, ? extends U> catamorphism) {
+        public <U> U fold(
+            Supplier<U> defaultValueSupplier,
+            Function<? super R, ? extends U> catamorphism
+        ) {
             Arguments.requireNotNull(defaultValueSupplier, "'defaultValueSupplier' argument cannot be null");
             return defaultValueSupplier.get();
         }
@@ -268,7 +274,10 @@ public interface Either<L, R> extends Monad<R> {
         }
 
         @Override
-        public <U> U fold(Supplier<U> defaultValueSupplier, Function<? super R, ? extends U> catamorphism) {
+        public <U> U fold(
+            Supplier<U> defaultValueSupplier,
+            Function<? super R, ? extends U> catamorphism
+        ) {
             Arguments.requireNotNull(catamorphism, "'catamorphism' argument cannot be null");
             return catamorphism.apply(this.value);
         }
