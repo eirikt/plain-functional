@@ -50,14 +50,14 @@ public class Sequence<T> implements Monad<T> {
     /**
      * Just for having a {@link Sequence} instance to reach the member methods, e.g. <code>pure</code>.
      */
-    public static <T> Sequence<T> withSequence() {
-        return withSequence(null);
+    public static <T> Sequence<T> asSequence() {
+        return asSequence(null);
     }
 
     /**
      * Just for having a typed {@link Sequence} instance to reach the member methods, e.g. <code>pure</code>.
      */
-    public static <T> Sequence<T> withSequence(Class<T> type) {
+    public static <T> Sequence<T> asSequence(Class<T> type) {
         return empty();
     }
 
@@ -158,10 +158,10 @@ public class Sequence<T> implements Monad<T> {
     ///////////////////////////////////////////////////////
 
     @Override
-    public <U> Sequence<U> map(Function<? super T, ? extends U> function) {
-        List<U> mappedValues = new ArrayList<>(this.values.size());
+    public <V> Sequence<V> map(Function<? super T, ? extends V> function) {
+        List<V> mappedValues = new ArrayList<>(this.values.size());
         for (T value : this.values) {
-            U mappedValue = function.apply(value);
+            V mappedValue = function.apply(value);
 
             // Partial function handling:
             // NB! Skipping inclusion as mapped value has no representation in the codomain
@@ -415,18 +415,18 @@ public class Sequence<T> implements Monad<T> {
      *
      * @param identityValue The identity value, acting as the initial value of this fold operation
      * @param catamorphism  The fold function
-     * @param <U>           The type of the folded/returning value
+     * @param <V>           The type of the folded/returning value
      * @return the folded value
      */
-    public <U> U foldLeft(BiFunction<U, ? super T, ? extends U> catamorphism, U identityValue) {
+    public <V> V foldLeft(BiFunction<V, ? super T, ? extends V> catamorphism, V identityValue) {
         return foldLeft(identityValue, catamorphism);
     }
 
     /**
      * <code>foldLeft</code> variant with swapped parameters.
      */
-    public <U> U foldLeft(U identityValue, BiFunction<U, ? super T, ? extends U> catamorphism) {
-        U foldedValue = identityValue;
+    public <V> V foldLeft(V identityValue, BiFunction<V, ? super T, ? extends V> catamorphism) {
+        V foldedValue = identityValue;
         for (T value : this.values) {
             foldedValue = catamorphism.apply(foldedValue, value);
         }
@@ -513,18 +513,18 @@ public class Sequence<T> implements Monad<T> {
      *
      * @param identityValue The identity value, acting as the initial value of this fold operation
      * @param catamorphism  The fold function
-     * @param <U>           The type of the folded/returning value
+     * @param <V>           The type of the folded/returning value
      * @return the folded value
      */
-    public <U> U foldRight(BiFunction<? super T, U, ? extends U> catamorphism, U identityValue) {
+    public <V> V foldRight(BiFunction<? super T, V, ? extends V> catamorphism, V identityValue) {
         return foldRight(identityValue, catamorphism);
     }
 
     /**
      * <code>foldRight</code> variant with swapped parameters.
      */
-    public <U> U foldRight(U identityValue, BiFunction<? super T, U, ? extends U> catamorphism) {
-        U foldedValue = identityValue;
+    public <V> V foldRight(V identityValue, BiFunction<? super T, V, ? extends V> catamorphism) {
+        V foldedValue = identityValue;
         ListIterator<T> listIterator = this.values.listIterator(this.values.size());
         while (listIterator.hasPrevious()) {
             foldedValue = catamorphism.apply(listIterator.previous(), foldedValue);
@@ -633,6 +633,7 @@ public class Sequence<T> implements Monad<T> {
     public MonoidStructure<T> toMonoid(T identityElement, BinaryOperator<T> binaryOperation) {
         return new MonoidStructure<>(
             new LinkedHashSet<>(this.values),
+            //new LinkedHashSet<>(toJavaList()),
             binaryOperation,
             identityElement
         );

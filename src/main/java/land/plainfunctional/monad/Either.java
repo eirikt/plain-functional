@@ -135,12 +135,12 @@ public interface Either<L, R> extends Monad<R> {
      *
      * @param onLeft  Supplier ("nullary" function/deferred constant) of the default value in case it is a 'Left'
      * @param onRight Function (unary) (the "catamorphism") to be applied to this functor's value in case it is a 'Right'
-     * @param <U>     The type of the folded/returning value
+     * @param <V>     The type of the folded/returning value
      * @return the folded value
      */
-    <U> U fold(
-        Supplier<U> onLeft,
-        Function<? super R, ? extends U> onRight
+    <V> V fold(
+        Supplier<V> onLeft,
+        Function<? super R, ? extends V> onRight
     );
 
 
@@ -149,7 +149,7 @@ public interface Either<L, R> extends Monad<R> {
     ///////////////////////////////////////////////////////////////////////////
 
     @Override
-    <U> Either<L, U> map(Function<? super R, ? extends U> function);
+    <V> Either<L, V> map(Function<? super R, ? extends V> function);
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -217,16 +217,16 @@ public interface Either<L, R> extends Monad<R> {
         }
 
         @Override
-        public <U> U fold(
-            Supplier<U> defaultValueSupplier,
-            Function<? super R, ? extends U> catamorphism
+        public <V> V fold(
+            Supplier<V> defaultValueSupplier,
+            Function<? super R, ? extends V> catamorphism
         ) {
             Arguments.requireNotNull(defaultValueSupplier, "'defaultValueSupplier' argument cannot be null");
             return defaultValueSupplier.get();
         }
 
         @Override
-        public <U> Either<L, U> map(Function<? super R, ? extends U> function) {
+        public <V> Either<L, V> map(Function<? super R, ? extends V> function) {
             Arguments.requireNotNull(function, "'function' argument cannot be null");
             return left(this.value);
         }
@@ -274,16 +274,16 @@ public interface Either<L, R> extends Monad<R> {
         }
 
         @Override
-        public <U> U fold(
-            Supplier<U> defaultValueSupplier,
-            Function<? super R, ? extends U> catamorphism
+        public <V> V fold(
+            Supplier<V> defaultValueSupplier,
+            Function<? super R, ? extends V> catamorphism
         ) {
             Arguments.requireNotNull(catamorphism, "'catamorphism' argument cannot be null");
             return catamorphism.apply(this.value);
         }
 
         @Override
-        public <U> Either<L, U> map(Function<? super R, ? extends U> function) {
+        public <V> Either<L, V> map(Function<? super R, ? extends V> function) {
             Arguments.requireNotNull(function, "'function' argument cannot be null");
             // Implementing homomorphism using a catamorphism.
             // Because here, the "catamorphism" is accidentally equal to a regular homomorphism...

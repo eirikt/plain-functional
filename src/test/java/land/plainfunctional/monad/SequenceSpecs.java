@@ -22,7 +22,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
-import static land.plainfunctional.monad.Sequence.withSequence;
+import static land.plainfunctional.monad.Sequence.asSequence;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -347,7 +347,7 @@ class SequenceSpecs {
 
     @Test
     void shouldPutValuesInThisApplicativeFunctor() {
-        Sequence<?> sequence = withSequence().pure("JustDoIt");
+        Sequence<?> sequence = Sequence.asSequence().pure("JustDoIt");
 
         assertThat(sequence.isEmpty()).isFalse();
         assertThat(sequence.size()).isEqualTo(1L);
@@ -356,7 +356,7 @@ class SequenceSpecs {
 
     @Test
     void shouldPutTypedValuesInThisApplicativeFunctor() {
-        Sequence<LocalDate> sequence = withSequence(LocalDate.class).pure(LocalDate.of(2010, 10, 13));
+        Sequence<LocalDate> sequence = asSequence(LocalDate.class).pure(LocalDate.of(2010, 10, 13));
 
         assertThat(sequence.isEmpty()).isFalse();
         assertThat(sequence.size()).isEqualTo(1L);

@@ -94,10 +94,10 @@ public interface Monad<T> extends Applicative<T> {
         //return (M) ((M) mappedMonad).join();
 
         Functor<Monad<V>> mappedMonad = map(function);
-        Monad<V> monad = (Monad<V>) mappedMonad;
+        Monad<V> layeredMonad = (Monad<V>) mappedMonad;
 
         // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
-        return (M) monad.join();
+        return (M) layeredMonad.join();
     }
 
     /**

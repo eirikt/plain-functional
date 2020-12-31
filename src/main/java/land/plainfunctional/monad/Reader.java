@@ -8,13 +8,16 @@ import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
 import land.plainfunctional.value.AbstractProtectedValue;
 
+import static java.util.function.Function.identity;
+import static land.plainfunctional.util.ReflectionUtils.createDefaultInstance;
+
 /**
  * <p>
  * <i>Functor context:</i>
  * <b>
  * A deferred ("lazy-evaluated") value
  * </b><br>
- * The value is typically <i>read</i> from an external/shared environment.
+ * The value is typically <i>read</i> from an external/shared environment, and may be arbitrary (neither <i>total</i> nor <i>deterministic</i>).
  * When evaluated (folded), the value will appear after an arbitrary amount of time.
  * Also, the value may not show up at all&mdash;like
  * {@link Either} and {@link Maybe}, the {@link Reader} context represents <a href="https://en.wikipedia.org/wiki/Partial_function">partiality</a>.
@@ -53,38 +56,30 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
 
     /**
      * Just for having a {@link Reader} instance to reach the member methods, e.g. <code>pure</code>.
+     * <b>NB! The given type must have an available empty constructor.</b>
      */
-    //TODO: @SuppressWarnings("unchecked")
-    public static <T> Reader<T> asReader() {
-        // TODO: @SuppressWarnings: ...
-        return (Reader<T>) asReaderOfType(Object.class);
-    }
-
-    /**
-     * Just for having a (typed) {@link Reader} instance to reach the member methods, e.g. <code>pure</code>.
-     */
-    //TODO: @SuppressWarnings("unchecked")
-    public static <T> Reader<T> asReaderOfType(Class<T> type) {
-        // TODO: @SuppressWarnings: ...
-        return startingWith((T) new Object());
+    //@SuppressWarnings("unchecked")
+    public static <T> Reader<T> asReader(Class<T> type) {
+        return startingWith(createDefaultInstance(type));
     }
 
     /**
      * Alias for 'of(alreadyAvailableValue)'
      */
     public static <T> Reader<T> startingWith(T value) {
-        return of(value);
+        return of(() -> value);
     }
 
-    /**
+    /* TODO: To Be removed, I guess
      * Factory method.
      *
      * @param value The (already available) value to be put into this {@link Reader} functor
      * @return A {@link Reader} value
-     */
+     /
     public static <T> Reader<T> of(T value) {
         return Reader.of(() -> value);
     }
+    */
 
     /**
      * Factory method.
@@ -127,7 +122,7 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
     ///////////////////////////////////////////////////////////////////////////
 
     @Override
-    public <U> Reader<U> map(Function<? super T, ? extends U> function) {
+    public <V> Reader<V> map(Function<? super T, ? extends V> function) {
         return map(function, null);
     }
 
@@ -158,10 +153,10 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
      * @param defaultValue If present (not <code>null</code>),
      *                     this parameter will be returned in case of this reader returns a bottom value.
      *                     (This is accomplished by transforming this reader to a maybe.)
-     * @param <U>          The type of the codomain
+     * @param <V>          The type of the codomain
      * @return the new/other functor
      */
-    public <U> Reader<U> map(Function<? super T, ? extends U> function, T defaultValue) {
+    public <V> Reader<V> map(Function<? super T, ? extends V> function, T defaultValue) {
         Arguments.requireNotNull(function, "'function' argument cannot be null");
         return new Reader<>(
             () -> defaultValue == null
@@ -177,7 +172,7 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
 
     @Override
     public Reader<T> pure(T value) {
-        return Reader.of(value);
+        return Reader.of(() -> value);
     }
 
     @Override
@@ -238,8 +233,20 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
      * @return the evaluated (deferred) value in a {@link Maybe} context
      */
     public Maybe<T> toMaybe() {
-        // NB! Blocks this thread while evaluating the 'Supplier'
-        Either<String, T> either = toEither();
+        // NB! Blocks current thread!
+        return toMaybeWithRetry(0);
+    }
+
+    /**
+     * Handling of bottom value evaluations using a {@link Maybe} functor.
+     * It delegates to <code>toEither</code>.
+     *
+     * @param numberOfRetries If reading fails, this function will retry <code>numberOfRetries</code> times before returning 'Nothing'
+     * @return the evaluated (deferred) value in a {@link Maybe} context
+     */
+    public Maybe<T> toMaybeWithRetry(int numberOfRetries) {
+        // NB! Blocks current thread!
+        Either<String, T> either = toEitherWithRetry(numberOfRetries);
 
         // Handles exceptions
         if (either.isLeft()) {
@@ -252,17 +259,32 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
     /**
      * Handling of bottom value evaluations using an {@link Either} functor,
      * and the Java built-in <code>try</code> "monad".
-     * This method is a an application of <code>fold</code>.
+     * This method is an application of <code>fold</code>.
      *
      * @return the evaluated (deferred) value in an {@link Either} context,
      * with a failure message as the 'Either.Left' if the value is for some reason is not available
      */
     public Either<String, T> toEither() {
-        // NB! Blocks this thread while evaluating the 'Supplier'
-        return fold(
+        // NB! Blocks current thread!
+        return toEitherWithRetry(0);
+    }
+
+    /**
+     * Handling of bottom value evaluations using an {@link Either} functor,
+     * and the Java built-in <code>try</code> "monad".
+     * This method is an application of <code>fold</code>.
+     *
+     * @param numberOfRetries If reading fails, this function will retry 'numberOfRetries' times before returning the 'Left' variant
+     * @return the evaluated (deferred) value in an {@link Either} context,
+     * with a failure message as the 'Either.Left' if the value is for some reason is not available
+     */
+    public Either<String, T> toEitherWithRetry(int numberOfRetries) {
+        // NB! Blocks current thread!
+        return foldWithRetry(
+            numberOfRetries,
             (exception) -> {
                 System.err.printf(
-                    "Reader evaluation failed, returning 'Either.Left'/'Maybe.Nothing', reason:%n%s",
+                    "Reader evaluation failed, returning 'Either.Left'/'Maybe.Nothing', reason:%n%s%n",
                     exception.getMessage()
                 );
                 return Either.left(exception.getMessage());
@@ -289,11 +311,10 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
      */
     public T tryGet() {
-        // NB! Blocks this thread while evaluating the 'Supplier'
+        // NB! Blocks current thread!
         return fold(
             (exception) -> { throw new RuntimeException(exception); },
-            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
-            (ignored) -> this.value.get()
+            identity()
         );
     }
 
@@ -324,33 +345,184 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
      * returning a new value of type<code>b</code>.
      * </p>
      *
+     * <p>...</p>
+     *
      * <p>
      * As {@link Reader} is a single-value functor, there is no need for a <i>binary</i> function;
      * It is replaced by an unary function, which transforms the single read value.
      * Also, the need for an initial value is redundant;
-     * It is replaced by a special "nullary" function in case this {@link Reader} return a bottom value, here an exception.
+     * It is replaced by a special unary function in case this {@link Reader} return a bottom value, here an exception, which is provided as the function parameter.
      * </p>
      *
+     * @param onRead Function (unary) (the "catamorphism") to be applied to the read value
+     * @param <V>    The type of the folded/returning value
      * @return the folded value
      */
-    public <U> U fold(
-        Function<Exception, ? extends U> onBottom,
-        Function<? super T, ? extends U> onRead
+    public <V> V tryFold(Function<? super T, ? extends V> onRead) {
+        // NB! Blocks current thread!
+        return fold(
+            (exception) -> { throw new RuntimeException(exception); },
+            onRead
+        );
+    }
+
+    /**
+     * <p>
+     * To <i>fold</i> a value means creating a new representation of it.
+     * For {@link Reader} instances this will force execution/evaluation.
+     * </p>
+     *
+     * <p>
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
+     * </p>
+     *
+     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>...</p>
+     *
+     * <p>
+     * As {@link Reader} is a single-value functor, there is no need for a <i>binary</i> function;
+     * It is replaced by an unary function, which transforms the single read value.
+     * Also, the need for an initial value is redundant;
+     * It is replaced by a special unary function in case this {@link Reader} return a bottom value, here an exception, which is provided as the function parameter.
+     * </p>
+     *
+     * @param onBottom Function (unary) with the bottom value (exception) provided as the function parameter
+     * @param onRead   Function (unary) (the "catamorphism") to be applied to the read value
+     * @param <V>      The type of the folded/returning value
+     * @return the folded value
+     */
+    public <V> V fold(
+        Function<Exception, ? extends V> onBottom,
+        Function<? super T, ? extends V> onRead
+    ) {
+        return foldWithRetry(0, onBottom, onRead);
+    }
+
+    /**
+     * <p>
+     * To <i>fold</i> a value means creating a new representation of it.
+     * For {@link Reader} instances this will force execution/evaluation.
+     * </p>
+     *
+     * <p>
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
+     * </p>
+     *
+     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>...</p>
+     *
+     * <p>
+     * As {@link Reader} is a single-value functor, there is no need for a <i>binary</i> function;
+     * It is replaced by an unary function, which transforms the single read value.
+     * Also, the need for an initial value is redundant;
+     * It is replaced by a special unary function in case this {@link Reader} return a bottom value, here an exception, which is provided as the function parameter.
+     * </p>
+     *
+     * @param numberOfRetries If folding fails, this function will retry folding 'numberOfRetries' times before invoking the 'onBottom' callback
+     * @param onBottom        Function (unary) with the bottom value (exception) provided as the function parameter
+     * @param onRead          Function (unary) (the "catamorphism") to be applied to the read value
+     * @param <V>             The type of the folded/returning value
+     * @return the folded value
+     */
+    public <V> V foldWithRetry(
+        int numberOfRetries,
+        Function<Exception, ? extends V> onBottom,
+        Function<? super T, ? extends V> onRead
+    ) {
+        return foldWithRetry(numberOfRetries, numberOfRetries, onBottom, onRead);
+    }
+
+    /**
+     * Folding with recursion-based retry.
+     *
+     * @param retryIndex           The number of retries left for this function before invoking the 'onBottom' callback
+     * @param totalNumberOfRetries The total number of retries this function will try before invoking the 'onBottom' callback
+     * @param onBottom             Function (unary) with the bottom value (exception) provided as the function parameter
+     * @param onRead               Function (unary) (the "catamorphism") to be applied to the read value
+     * @param <V>                  The type of the folded/returning value
+     * @return the folded value
+     */
+    <V> V foldWithRetry(
+        int retryIndex,
+        int totalNumberOfRetries,
+        Function<Exception, ? extends V> onBottom,
+        Function<? super T, ? extends V> onRead
     ) {
         try {
-            // NB! Blocks this thread while evaluating the 'Supplier'
+            // NB! Blocks current thread!
             return onRead.apply(this.value.get());
 
         } catch (Exception exception) {
+            if (retryIndex > 0) {
+                System.out.printf(
+                    "'Reader.fold' evaluation failed, retrying... (%d/%d)%n",
+                    retryIndex - 1, totalNumberOfRetries
+                );
+                return foldWithRetry(retryIndex - 1, totalNumberOfRetries, onBottom, onRead);
+            }
             System.err.printf(
-                "'Reader.fold' evaluation failed, executing 'onBottom' 'Supplier' (\"nullary\" function): reason:%n%s",
+                "'Reader.fold' evaluation failed, executing 'onBottom' 'Supplier' (\"nullary\" function): reason:%n%s%n",
                 exception.getMessage()
             );
             return onBottom.apply(exception);
         }
     }
 
+
     ///////////////////////////////////////////////////////////////////////////
     // java.lang.Object
+    //
+    // NB! Must step back to Object.hashCode and Object.equals()
+    // for avoiding throwing away 'Reader' instances e.g. in 'Set' semantics
     ///////////////////////////////////////////////////////////////////////////
+
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (other == null || getClass() != other.getClass()) {
+            return false;
+        }
+        Reader<?> otherReader = (Reader<?>) other;
+
+        return this.hashCode() == otherReader.hashCode();
+    }
 }

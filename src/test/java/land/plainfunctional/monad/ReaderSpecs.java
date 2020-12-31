@@ -14,6 +14,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 import land.plainfunctional.algebraicstructure.FreeMonoid;
+import land.plainfunctional.algebraicstructure.MonoidStructure;
 import land.plainfunctional.testdomain.TestFunctions;
 import land.plainfunctional.testdomain.vanillaecommerce.Customer;
 import land.plainfunctional.testdomain.vanillaecommerce.Person;
@@ -21,25 +22,26 @@ import land.plainfunctional.testdomain.vanillaecommerce.VipCustomer;
 import land.plainfunctional.util.RandomUtils;
 
 import static java.lang.Integer.sum;
-import static java.lang.Thread.sleep;
+import static java.lang.String.format;
 import static java.time.Duration.between;
 import static java.time.Instant.now;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.monad.Reader.asReader;
-import static land.plainfunctional.monad.Reader.asReaderOfType;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
+import static land.plainfunctional.util.InstrumentationUtils.sleep;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.util.Arrays.array;
 
-class ReaderSpecs {
+public class ReaderSpecs {
 
     ///////////////////////////////////////////////////////////////////////////
     // Random test values
     ///////////////////////////////////////////////////////////////////////////
 
-    RandomUtils random = new RandomUtils();
+    static RandomUtils random = new RandomUtils();
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -51,181 +53,202 @@ class ReaderSpecs {
     //
     ///////////////////////////////////////////////////////////////////////////
 
-    Supplier<?> runtimeExceptionSupplier = RuntimeException::new;
-    Supplier<?> throwRuntimeExceptionSupplier =
+    static Supplier<?> runtimeExceptionSupplier = RuntimeException::new;
+    static Supplier<?> throwRuntimeExceptionSupplier =
         () -> {
             throw new RuntimeException();
         };
-    Supplier<?> nullSupplier = () -> null;
+    static Supplier<?> nullSupplier = () -> null;
 
 
-    Supplier<Integer> zeroSupplier = () -> 0;
-    Supplier<Integer> deferredZero = zeroSupplier;
+    static Supplier<Integer> zeroSupplier = () -> 0;
+    static Supplier<Integer> deferredZero = zeroSupplier;
 
 
-    Supplier<Integer> oneSupplier = () -> 1;
-    Supplier<Integer> deferredOne = () -> 1;
-    Supplier<Integer> delayedOneSupplier =
+    static Supplier<Integer> oneSupplier = () -> 1;
+    static Supplier<Integer> deferredOne = () -> 1;
+    static Supplier<Integer> delayedOneSupplier =
         () -> {
-            try {
-                sleep(200); // ms
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
+            sleep(200, MILLISECONDS);
             return oneSupplier.get();
         };
-    Supplier<Maybe<Integer>> delayedJustOneSupplier =
+    static Supplier<Maybe<Integer>> delayedJustOneSupplier =
         () -> {
-            try {
-                sleep(random.pickRandomInteger(200, 5000)); // ms
-                return just(oneSupplier.get());
-
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
+            sleep(random.pickRandomInteger(200, 5000), MILLISECONDS);
+            return just(oneSupplier.get());
         };
-    Supplier<Maybe<Integer>> delayedMaybeOneSupplier =
+    static Supplier<Maybe<Integer>> delayedMaybeOneSupplier =
         () -> {
-            try {
-                sleep(random.pickRandomInteger(200, 5000)); // ms
-                return random.pickRandomBoolean()
-                    ? just(oneSupplier.get())
-                    : nothing();
-
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
+            sleep(random.pickRandomInteger(200, 5000), MILLISECONDS);
+            return random.pickRandomBoolean()
+                ? just(oneSupplier.get())
+                : nothing();
         };
 
 
-    Supplier<Integer> randomNumberSupplier = () -> random.pickRandomIntegerBetweenOneAnd(1000);
+    static Supplier<Integer> randomIntegerSupplier = () -> random.pickRandomIntegerBetweenOneAnd(1000);
 
-    Supplier<Maybe<Integer>> delayedMaybeRandomNumberSupplier =
-        () -> {
-            Instant start = now();
-            try {
-                sleep(random.pickRandomInteger(200, 3000)); // ms
-                Maybe<Integer> maybeInteger = random.pickRandomBoolean()
-                    ? just(randomNumberSupplier.get())
-                    : nothing();
-                System.out.printf(
-                    "'delayedMaybeRandomNumberSupplier' -> %s, took %d ms%n",
-                    maybeInteger.toStringMaybe(),
-                    between(start, now()).toMillis()
-                );
-                return maybeInteger;
-
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
-        };
-
+    /*
     // Emulating a typical remote operation, which includes a time-out mechanism
-    static Integer GET_DELAYED_RANDOM_INT_OR_TIMEOUT(RandomUtils random) {
+    static Integer getRandomlyDelayedOrTimedOutRandomInteger() {
         Instant start = now();
-        try {
-            sleep(random.pickRandomInteger(200, 3000)); // ms
-            boolean successfulEvaluation = random.pickRandomBoolean();
-            if (successfulEvaluation) {
-                int evaluatedValue = random.pickRandomIntegerBetweenOneAnd(1000);
-                System.out.printf(
-                    "'GET_DELAYED_RANDOM_INT_OR_TIMEOUT' -> %s, took %d ms%n",
-                    evaluatedValue,
-                    between(start, now()).toMillis()
-                );
-                return evaluatedValue;
-            }
-            System.err.printf(
-                "'GET_DELAYED_RANDOM_INT_OR_TIMEOUT' -> %s, took %d ms%n",
-                "runtime exception",
+        int randomInteger = random.pickRandomInteger(200, 3000);
+        sleep(randomInteger, MILLISECONDS);
+        boolean successfulEvaluation = randomInteger < 2000; // ms
+        if (successfulEvaluation) {
+            int evaluatedValue = randomNumberSupplier.get();
+            System.out.printf(
+                "'getRandomlyDelayedOrTimedOutRandomInteger' -> %s, took %d ms%n",
+                evaluatedValue,
                 between(start, now()).toMillis()
             );
-            throw new RuntimeException(new TimeoutException("This took way too long!"));
-
-        } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
+            return evaluatedValue;
         }
+        System.err.printf(
+            "'getRandomlyDelayedOrTimedOutRandomInteger' -> %s, took %d ms%n",
+            "runtime exception",
+            between(start, now()).toMillis()
+        );
+        throw new RuntimeException(new TimeoutException(format("This took way too long!%n")));
+    }
+    */
+    static Integer getRandomlyDelayedOrTimedOutRandomInteger() {
+        return getRandomlyDelayedOrTimedOutInteger(
+            // random.generateRandomString(2, 6)
+            randomIntegerSupplier.get()
+        );
     }
 
-    Supplier<Integer> delayedRandomNumberOrBottomSupplier = () -> GET_DELAYED_RANDOM_INT_OR_TIMEOUT(random);
-    Reader<Integer> delayedRandomNumberOrBottomReader = Reader.of(delayedRandomNumberOrBottomSupplier);
+    // Emulating a typical remote operation (which includes a time-out mechanism)
+    static Integer getRandomlyDelayedOrTimedOutInteger(Integer integer) {
+        return getDelayedOrTimedOutInteger(
+            2000, // => ~ 1/3 chance of timeout
+            random.pickRandomInteger(200, 3000),
+            integer
+        );
+    }
 
+    public static Integer getDelayedInteger(Integer integer) {
+        return getDelayedOrTimedOutInteger(
+            null,
+            1000,
+            integer
+        );
+    }
 
-    Supplier<LocalDate> todaySupplier = LocalDate::now;
-    Supplier<LocalDateTime> nowSupplier = LocalDateTime::now;
+    // Emulating a typical remote operation (which includes a time-out mechanism)
+    static Integer getDelayedOrTimedOutInteger(Integer timeOutThresholdInMilliseconds, Integer delayInMilliseconds, Integer integer) {
+        Instant start = now();
 
+        if (timeOutThresholdInMilliseconds == null) {
+            timeOutThresholdInMilliseconds = Integer.MAX_VALUE;
+        }
+        if (delayInMilliseconds == null) {
+            timeOutThresholdInMilliseconds = Integer.MAX_VALUE;
+        }
+        sleep(delayInMilliseconds, MILLISECONDS);
+        boolean successfulEvaluation = delayInMilliseconds < timeOutThresholdInMilliseconds;
+        if (successfulEvaluation) {
+            System.out.printf(
+                "'getDelayedOrTimedOutString' -> \"%s\", took %d ms%n",
+                integer,
+                between(start, now()).toMillis()
+            );
+            return integer;
+        }
+        System.out.printf(
+            "'getDelayedOrTimedOutString' -> %s, took %d ms%n",
+            "timeout",
+            between(start, now()).toMillis()
+        );
+        throw new RuntimeException(new TimeoutException(format("This took way too long!%n")));
+    }
 
-    Supplier<String> helloWorldSupplier = () -> "Hello World!";
-    Supplier<String> delayedHelloWorldSupplier =
+    static Supplier<Integer> delayedRandomIntegerOrBottomSupplier = ReaderSpecs::getRandomlyDelayedOrTimedOutRandomInteger;
+    static Supplier<Maybe<Integer>> delayedMaybeRandomIntegerSupplier =
         () -> {
             try {
-                sleep(200); // ms
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
+                return just(delayedRandomIntegerOrBottomSupplier.get());
+
+            } catch (Exception ex) {
+                return nothing();
             }
+        };
+    private static Reader<Integer> delayedRandomIntegerOrBottomReader = Reader.of(delayedRandomIntegerOrBottomSupplier);
+
+
+    static Supplier<String> helloWorldSupplier = () -> "Hello World!";
+    static Supplier<String> delayedHelloWorldSupplier =
+        () -> {
+            sleep(1000, MILLISECONDS);
             return helloWorldSupplier.get();
         };
 
 
-    Supplier<String> randomStringSupplier = () -> random.generateRandomString(2, 6);
+    //static Supplier<String> randomStringSupplier = () -> random.generateRandomString(2, 6);
 
-    // Emulating a typical over-the-wire invocation, which includes a time-out mechanism
-    /*
-    Supplier<String> delayedRandomStringOrBottomSupplier =
-        () -> {
-            Instant start = now();
-            try {
-                sleep(random.pickRandomInteger(200, 3000)); // ms
-                boolean successfulEvaluation = random.pickRandomBoolean();
-                if (successfulEvaluation) {
-                    String evaluatedValue = randomStringSupplier.get();
-                    System.out.printf(
-                        "'delayedRandomStringOrBottomSupplier' -> %s, took %d ms%n",
-                        evaluatedValue,
-                        between(start, now()).toMillis()
-                    );
-                    return evaluatedValue;
-                }
-                System.out.printf(
-                    "'delayedRandomStringOrBottomSupplier' -> %s, took %d ms%n",
-                    "runtime exception",
-                    between(start, now()).toMillis()
-                );
-                throw new RuntimeException(new TimeoutException("This took way too long!"));
-
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
-        };
-    */
-    static String GET_DELAYED_RANDOM_STRING_OR_TIMEOUT(RandomUtils random) {
-        Instant start = now();
-        try {
-            sleep(random.pickRandomInteger(200, 3000)); // ms
-            boolean successfulEvaluation = random.pickRandomBoolean();
-            if (successfulEvaluation) {
-                String evaluatedValue = random.generateRandomString(2, 6);
-                System.out.printf(
-                    "'delayedRandomStringOrBottomSupplier' -> %s, took %d ms%n",
-                    evaluatedValue,
-                    between(start, now()).toMillis()
-                );
-                return evaluatedValue;
-            }
-            System.out.printf(
-                "'delayedRandomStringOrBottomSupplier' -> %s, took %d ms%n",
-                "runtime exception",
-                between(start, now()).toMillis()
-            );
-            throw new RuntimeException(new TimeoutException("This took way too long!"));
-
-        } catch (InterruptedException ex) {
-            throw new RuntimeException(ex);
-        }
+    // Emulating a typical remote operation (which includes a time-out mechanism)
+    static String getRandomlyDelayedOrTimedOutRandomString() {
+        return getRandomlyDelayedOrTimedOutString(
+            random.generateRandomString(2, 6)
+        );
     }
 
-    Supplier<String> delayedRandomStringOrBottomSupplier = () -> GET_DELAYED_RANDOM_STRING_OR_TIMEOUT(random);
-    Reader<String> delayedRandomStringOrBottomReader = Reader.of(delayedRandomStringOrBottomSupplier);
+    //public static Function<String, String> delayedStringOrBottomFunction = (string) -> GET_RANDOMLY_DELAYED_STRING_OR_TIMEOUT(string, random);
+
+    //public static Supplier<String> delayedRandomStringOrBottomSupplier = ReaderSpecs::GET_RANDOMLY_DELAYED_OR_TIMED_OUT_RANDOM_STRING;
+    //private static Reader<String> delayedRandomStringOrBottomReader = Reader.of(delayedRandomStringOrBottomSupplier);
+
+    // Emulating a typical remote operation (which includes a time-out mechanism)
+    static String getRandomlyDelayedOrTimedOutString(String string) {
+        return getDelayedOrTimedOutString(
+            2000, // => ~ 1/3 chance of timeout
+            random.pickRandomInteger(200, 3000),
+            string
+        );
+    }
+
+    public static String getDelayedString(String string) {
+        return getDelayedOrTimedOutString(
+            null,
+            1000,
+            string
+        );
+    }
+
+    //public static Function<String, String> delayedStringOrBottomFunction = ReaderSpecs::GET_RANDOMLY_DELAYED_OR_TIMED_OUT_STRING;
+
+    // Emulating a typical remote operation (which includes a time-out mechanism)
+    static String getDelayedOrTimedOutString(Integer timeOutThresholdInMilliseconds, Integer delayInMilliseconds, String string) {
+        Instant start = now();
+
+        if (timeOutThresholdInMilliseconds == null) {
+            timeOutThresholdInMilliseconds = Integer.MAX_VALUE;
+        }
+        if (delayInMilliseconds == null) {
+            timeOutThresholdInMilliseconds = Integer.MAX_VALUE;
+        }
+        sleep(delayInMilliseconds, MILLISECONDS);
+        boolean successfulEvaluation = delayInMilliseconds < timeOutThresholdInMilliseconds;
+        if (successfulEvaluation) {
+            System.out.printf(
+                "'getDelayedOrTimedOutString' -> \"%s\", took %d ms%n",
+                string,
+                between(start, now()).toMillis()
+            );
+            return string;
+        }
+        System.out.printf(
+            "'getDelayedOrTimedOutString' -> %s, took %d ms%n",
+            "timeout",
+            between(start, now()).toMillis()
+        );
+        throw new RuntimeException(new TimeoutException(format("This took way too long!%n")));
+    }
+
+
+    static Supplier<LocalDate> todaySupplier = LocalDate::now;
+    static Supplier<LocalDateTime> nowSupplier = LocalDateTime::now;
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -236,6 +259,12 @@ class ReaderSpecs {
         new FreeMonoid<>(
             Integer::sum,
             0
+        );
+
+    public static final FreeMonoid<String> STRING_APPENDING_MONOID =
+        new FreeMonoid<>(
+            (string1, string2) -> string1 + string2,
+            ""
         );
 
 
@@ -259,23 +288,23 @@ class ReaderSpecs {
 
     @Test
     void shouldBeDeferred_1a() {
-        Reader<?> lazy = Reader.of(throwRuntimeExceptionSupplier);
+        Reader<?> reader = Reader.of(throwRuntimeExceptionSupplier);
 
-        assertThatThrownBy(lazy::tryGet).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(reader::tryGet).isInstanceOf(RuntimeException.class);
     }
 
     @Test
     void shouldBeDeferred_1b() {
-        Reader<?> lazy = Reader.of(runtimeExceptionSupplier);
+        Reader<?> reader = Reader.of(runtimeExceptionSupplier);
 
-        assertThat(lazy.tryGet()).isInstanceOf(RuntimeException.class);
+        assertThat(reader.tryGet()).isInstanceOf(RuntimeException.class);
     }
 
     @Test
     void shouldBeDeferred_2() {
-        Reader<?> lazy = Reader.of(nullSupplier);
+        Reader<?> reader = Reader.of(nullSupplier);
 
-        assertThat(lazy.tryGet()).isNull();
+        assertThat(reader.tryGet()).isNull();
     }
 
     @Test
@@ -299,8 +328,8 @@ class ReaderSpecs {
         VipCustomer vipCustomer = new VipCustomer();
         vipCustomer.vipCustomerSince = OffsetDateTime.now();
 
-        Reader<Person> lazyPerson = Reader.of(vipCustomer);
-        Reader<Customer> lazyCustomer = Reader.of(vipCustomer);
+        Reader<Person> readPerson = Reader.of(() -> vipCustomer);
+        Reader<Customer> readCustomer = Reader.of(() -> vipCustomer);
     }
 
 
@@ -327,7 +356,7 @@ class ReaderSpecs {
         String id_a = "";
 
         // TODO: Is this correctly set up?
-        Reader<String> f_id_a = Reader.of(id_a);
+        Reader<String> f_id_a = Reader.of(() -> id_a);
         Reader<String> id_f_a = Function.<Reader<String>>identity().apply(f_id_a);
 
         assertThat(f_id_a).isSameAs(id_f_a);
@@ -411,14 +440,7 @@ class ReaderSpecs {
 
     @Test
     void shouldPutValuesInThisApplicativeFunctor() {
-        Reader<?> reader = asReader().pure("JustDoIt");
-
-        assertThat(reader.tryGet()).isEqualTo("JustDoIt");
-    }
-
-    @Test
-    void shouldPutTypedValuesInThisApplicativeFunctor() {
-        Reader<String> reader = asReaderOfType(String.class).pure("JustDoIt");
+        Reader<String> reader = asReader(String.class).pure("JustDoIt");
 
         assertThat(reader.tryGet()).isEqualTo("JustDoIt");
     }
@@ -491,7 +513,7 @@ class ReaderSpecs {
         String value = "Blue";
 
         // m (Data constructor)
-        Function<String, Reader<String>> m = Reader::of;
+        Function<String, Reader<String>> m = Reader::startingWith;
 
         // m a
         Reader<String> m_a = m.apply(value);
@@ -541,7 +563,7 @@ class ReaderSpecs {
         String value = "Go";
 
         // m (Data constructor)
-        Function<String, Reader<String>> m = Reader::of;
+        Function<String, Reader<String>> m = Reader::startingWith;
 
         // m a
         Reader<String> m_a = m.apply(value);
@@ -589,7 +611,7 @@ class ReaderSpecs {
 
 
     ///////////////////////////////////////////////////////////////////////////
-    // Misc. applications of lazy evaluation
+    // Misc. applications of deferred evaluation
     ///////////////////////////////////////////////////////////////////////////
 
     @Test
@@ -597,15 +619,15 @@ class ReaderSpecs {
         Instant start = now();
 
         Reader<Boolean> helloWorldLengthIsEvenNumberReader = Reader
-            .of(delayedHelloWorldSupplier) // 200 ms delay
+            .of(delayedHelloWorldSupplier) // 1000 ms delay
             .map(String::length)
             .map(TestFunctions::isEven)
             .map(TestFunctions::isTrue);
 
-        //assertThat(between(start, now()).toMillis()).isLessThan(10); // ms
+        assertThat(between(start, now()).toMillis()).isLessThan(10); // ms
         // Blocks!
         assertThat(helloWorldLengthIsEvenNumberReader.tryGet()).isTrue();
-        assertThat(between(start, now()).toMillis()).isGreaterThan(200); // ms
+        assertThat(between(start, now()).toMillis()).isGreaterThan(1000); // ms
     }
 
     @Test
@@ -613,7 +635,7 @@ class ReaderSpecs {
         Instant start = now();
 
         Reader<Maybe<Integer>> helloWorldLengthIsEvenNumberReader = Reader
-            .of(delayedMaybeRandomNumberSupplier) // 200 - 3000 ms
+            .of(delayedMaybeRandomIntegerSupplier) // 200 - 3000 ms
             .map(new Function<Maybe<Integer>, Maybe<Integer>>() {
                 @Override
                 public Maybe<Integer> apply(Maybe<Integer> integerMaybe) {
@@ -656,7 +678,7 @@ class ReaderSpecs {
         Instant start = now();
 
         Reader<Maybe<Integer>> helloWorldLengthIsEvenNumberReader = Reader
-            .of(delayedMaybeRandomNumberSupplier)
+            .of(delayedMaybeRandomIntegerSupplier)
             .bind(new Function<Maybe<Integer>, Reader<Maybe<Integer>>>() {
                 @Override
                 public Reader<Maybe<Integer>> apply(Maybe<Integer> maybeInteger) {
@@ -682,7 +704,7 @@ class ReaderSpecs {
                 () -> maybeInteger.map(
                     (integer) -> integer + 1)
             ))
-            .bind((maybeInteger) -> Reader.of(maybeInteger.map((integer) -> integer + 1)));
+            .bind((maybeInteger) -> Reader.of(() -> maybeInteger.map((integer) -> integer + 1)));
 
         assertThat(between(start, now()).toMillis()).isLessThan(10); // ms
 
@@ -699,7 +721,7 @@ class ReaderSpecs {
 
     public static final Function<Integer, Reader<Integer>> INCR_AS_READER_MONAD_ACTION =
         (integer) ->
-            Reader.of(integer + 1);
+            Reader.of(() -> integer + 1);
 
     public static final Function<Integer, Reader<Integer>> INCR = INCR_AS_READER_MONAD_ACTION;
 
@@ -707,18 +729,18 @@ class ReaderSpecs {
     void whenBinding_shouldDeferExecution_2() {
         Instant start = now();
 
-        Supplier<Integer> slowAndFragileOperation = delayedRandomNumberOrBottomSupplier;
+        Supplier<Integer> slowAndFragileOperation = delayedRandomIntegerOrBottomSupplier;
 
         Function<Integer, Reader<Integer>> monadAction1 = (integer) -> Reader
             .of(slowAndFragileOperation)
             .apply(
                 Reader
-                    .of(integer)
+                    .of(() -> integer)
                     .map(INTEGERS_UNDER_ADDITION_MONOID.curriedBinaryOperation())
             );
 
         Function<Integer, Reader<Integer>> monadAction2 = (integer) -> Reader
-            .of(integer)
+            .of(() -> integer)
             .apply(
                 Reader
                     .of(slowAndFragileOperation)
@@ -731,7 +753,7 @@ class ReaderSpecs {
                 .then(new Function<Integer, Reader<Integer>>() {
                     @Override
                     public Reader<Integer> apply(Integer integer) {
-                        return Reader.of(integer + 1);
+                        return Reader.of(() -> integer + 1);
                     }
                 })
                 .then(INCR_AS_READER_MONAD_ACTION)
@@ -764,7 +786,7 @@ class ReaderSpecs {
     }
 
     // NB! Ad-hoc experimentations
-    //@Test
+    @Test
     void shouldFoldDifferentStructures() {
 
         // Sequence<Integer>
@@ -837,9 +859,9 @@ class ReaderSpecs {
         System.out.println();
         System.out.println("Folding 'Sequence<Reader<Maybe<Integer>>>' using 'Maybe::getOrDefault'");
         Sequence<Reader<Maybe<Integer>>> sequenceOfMaybeIntegerReaders = Sequence.of(
-            Reader.of(delayedMaybeRandomNumberSupplier),
-            Reader.of(delayedMaybeRandomNumberSupplier),
-            Reader.of(delayedMaybeRandomNumberSupplier)
+            Reader.of(delayedMaybeRandomIntegerSupplier),
+            Reader.of(delayedMaybeRandomIntegerSupplier),
+            Reader.of(delayedMaybeRandomIntegerSupplier)
         );
         Reader<Maybe<Integer>> foldedMaybeIntegerReader = sequenceOfMaybeIntegerReaders.foldLeft(
             Reader.of(Maybe::nothing),
@@ -863,9 +885,9 @@ class ReaderSpecs {
         System.out.println();
         System.out.println("Folding 'Sequence<Reader<Maybe<Integer>>>' using 'Reader::toMaybe' (1)");
         sequenceOfMaybeIntegerReaders = Sequence.of(
-            Reader.of(delayedMaybeRandomNumberSupplier),
-            Reader.of(delayedMaybeRandomNumberSupplier),
-            Reader.of(delayedMaybeRandomNumberSupplier)
+            Reader.of(delayedMaybeRandomIntegerSupplier),
+            Reader.of(delayedMaybeRandomIntegerSupplier),
+            Reader.of(delayedMaybeRandomIntegerSupplier)
         );
         foldedMaybeIntegerReader = sequenceOfMaybeIntegerReaders.foldLeft(
             Reader.of(Maybe::nothing),
@@ -889,9 +911,9 @@ class ReaderSpecs {
         System.out.println();
         System.out.println("Folding \"flaky\" 'Sequence<Reader<Integer>>' using 'Reader::toMaybe' (2)");
         Sequence<Reader<Integer>> sequenceOfIntegerReaders = Sequence.of(
-            Reader.of(delayedRandomNumberOrBottomSupplier),
-            Reader.of(delayedRandomNumberOrBottomSupplier),
-            Reader.of(delayedRandomNumberOrBottomSupplier)
+            Reader.of(delayedRandomIntegerOrBottomSupplier),
+            Reader.of(delayedRandomIntegerOrBottomSupplier),
+            Reader.of(delayedRandomIntegerOrBottomSupplier)
         );
         Reader<Integer> foldedLazyInteger = sequenceOfIntegerReaders.foldLeft(
             Reader.of(() -> 0),
@@ -912,9 +934,9 @@ class ReaderSpecs {
         System.out.println();
         System.out.println("Map-folding (\"MapReducing\") \"flaky\" 'Sequence<Reader<Integer>>' using 'Reader::toMaybe' (3)");
         sequenceOfIntegerReaders = Sequence.of(
-            Reader.of(delayedRandomNumberOrBottomSupplier),
-            Reader.of(delayedRandomNumberOrBottomSupplier),
-            Reader.of(delayedRandomNumberOrBottomSupplier)
+            Reader.of(delayedRandomIntegerOrBottomSupplier),
+            Reader.of(delayedRandomIntegerOrBottomSupplier),
+            Reader.of(delayedRandomIntegerOrBottomSupplier)
         );
         Integer foldedSequenceOfIntegers =
             sequenceOfIntegerReaders
@@ -939,11 +961,13 @@ class ReaderSpecs {
                 )
             );
         sequenceOfIntegerReaders = Sequence.of(
-            Reader.of(delayedRandomNumberOrBottomSupplier),
-            Reader.of(delayedRandomNumberOrBottomSupplier),
-            Reader.of(delayedRandomNumberOrBottomSupplier)
+            Reader.of(delayedRandomIntegerOrBottomSupplier),
+            Reader.of(delayedRandomIntegerOrBottomSupplier),
+            Reader.of(delayedRandomIntegerOrBottomSupplier)
         );
-        foldedLazyInteger = sequenceOfIntegerReaders.toMonoid(lazyIdentity, lazyPlus).fold();
+        MonoidStructure<Reader<Integer>> readerMonoid = sequenceOfIntegerReaders.toMonoid(lazyIdentity, lazyPlus);
+        assertThat(readerMonoid.size()).isEqualTo(sequenceOfIntegerReaders.size());
+        foldedLazyInteger = readerMonoid.fold();
         // Blocks!
         foldedValue = foldedLazyInteger.tryGet();
         System.out.println(foldedValue);
@@ -957,6 +981,7 @@ class ReaderSpecs {
         System.out.println(foldedValue);
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
 
+
         // Sequence<Reader<Integer>>
         System.out.println();
         System.out.println("Using 'FreeMonoid' for folding \"flaky\" 'Sequence<Reader<Integer>>'");
@@ -964,9 +989,9 @@ class ReaderSpecs {
         FreeMonoid<Reader<Integer>> freeMonoid = new FreeMonoid<>(lazyPlus, lazyIdentity);
 
         sequenceOfIntegerReaders = Sequence.of(
-            delayedRandomNumberOrBottomReader,
-            delayedRandomNumberOrBottomReader,
-            delayedRandomNumberOrBottomReader
+            delayedRandomIntegerOrBottomReader,
+            delayedRandomIntegerOrBottomReader,
+            delayedRandomIntegerOrBottomReader
         );
         foldedLazyInteger = sequenceOfIntegerReaders.toMonoid(freeMonoid).fold();
         // Blocks! ?
@@ -984,7 +1009,7 @@ class ReaderSpecs {
     }
 
     // NB! Ad-hoc experimentations
-    //@Test
+    @Test
     void shouldFoldDifferentStructures_2() {
         FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
 
@@ -994,16 +1019,16 @@ class ReaderSpecs {
             .of(monoid.deferredIdentity())
             .apply(Reader
                 //.of(delayedRandomNumberOrBottomSupplier)
-                .of(randomNumberSupplier)
+                .of(randomIntegerSupplier)
                 //.map(curriedPlus)
                 .map(monoid.curriedBinaryOperation())
             )
             .apply(Reader
-                .of(randomNumberSupplier)
+                .of(randomIntegerSupplier)
                 .map(monoid.curriedBinaryOperation())
             )
             .apply(Reader
-                .of(randomNumberSupplier)
+                .of(randomIntegerSupplier)
                 .map(monoid.curriedBinaryOperation())
             );
         int foldedValue = integerReader.toMaybe().getOrDefault(0);
@@ -1018,15 +1043,15 @@ class ReaderSpecs {
             //.of(deferredZero) // Deferred identity value - together with 'curriedPlus' it forms a monoid
             .of(monoid.deferredIdentity())
             .apply(Reader
-                .of(delayedRandomNumberOrBottomSupplier)
+                .of(delayedRandomIntegerOrBottomSupplier)
                 .map(monoid.curriedBinaryOperation())
             )
             .apply(Reader
-                .of(delayedRandomNumberOrBottomSupplier)
+                .of(delayedRandomIntegerOrBottomSupplier)
                 .map(monoid.curriedBinaryOperation())
             )
             .apply(Reader
-                .of(delayedRandomNumberOrBottomSupplier)
+                .of(delayedRandomIntegerOrBottomSupplier)
                 .map(monoid.curriedBinaryOperation())
             );
         // Blocks!
@@ -1043,21 +1068,25 @@ class ReaderSpecs {
             .of(monoid.deferredIdentity())
             //.of(lazyMonoid.identityElement)
 
-            .apply(delayedRandomNumberOrBottomReader
+            .apply(delayedRandomIntegerOrBottomReader
                 .map(new Function<Integer, Function<? super Integer, ? extends Integer>>() {
-                    @Override
-                    public Function<? super Integer, ? extends Integer> apply(Integer int1) {
-                        return new Function<Integer, Integer>() {
-                            @Override
-                            public Integer apply(Integer int2) {
-                                return monoid.binaryOperation.apply(int1, int2);
-                            }
-                        };
-                    }
-                }, monoid.identityElement)
+                         @Override
+                         public Function<? super Integer, ? extends Integer> apply(Integer int1) {
+                             return new Function<Integer, Integer>() {
+                                 @Override
+                                 public Integer apply(Integer int2) {
+                                     return monoid.binaryOperation.apply(int1, int2);
+                                 }
+                             };
+                         }
+                     }//, monoid.identityElement
+                )
             )
             //.apply(delayedRandomNumberOrBottomReader.map2(curriedPlus, 0))
-            .apply(delayedRandomNumberOrBottomReader.map(monoid.curriedBinaryOperation(), monoid.identityElement));
+            .apply(delayedRandomIntegerOrBottomReader.map(
+                monoid.curriedBinaryOperation()//,
+                //monoid.identityElement
+            ));
 
         foldedValue = integerReader.toMaybe().getOrDefault(0);
         System.out.println(foldedValue);
@@ -1071,9 +1100,9 @@ class ReaderSpecs {
         FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
 
         System.out.println("Building deferred computational structure...");
-        Supplier<Integer> slowAndFragileOperation1 = delayedRandomNumberOrBottomSupplier;
-        Supplier<Integer> slowAndFragileOperation2 = delayedRandomNumberOrBottomSupplier;
-        Supplier<Integer> slowAndFragileOperation3 = delayedRandomNumberOrBottomSupplier;
+        Supplier<Integer> slowAndFragileOperation1 = delayedRandomIntegerOrBottomSupplier;
+        Supplier<Integer> slowAndFragileOperation2 = delayedRandomIntegerOrBottomSupplier;
+        Supplier<Integer> slowAndFragileOperation3 = delayedRandomIntegerOrBottomSupplier;
 
         int defaultValue = monoid.identityElement; // If map does not return a value
         Function<Integer, Function<Integer, Integer>> appendFunction = monoid.curriedBinaryOperation();
@@ -1096,13 +1125,13 @@ class ReaderSpecs {
     }
 
     // NB! Ad-hoc experimentations
-    //@Test
+    @Test
     void shouldUseMonoidAndApplicativeForFoldingDeferredSameTypeComputationalStructures_2() {
         System.out.println("Declaring the monoid (for some computational structure)...");
         FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
 
         System.out.println("Building deferred computational structure...");
-        Supplier<String> slowAndFragileOperation = delayedRandomStringOrBottomSupplier;
+        Supplier<String> slowAndFragileOperation = ReaderSpecs::getRandomlyDelayedOrTimedOutRandomString;
 
         Reader<String> reader = Reader.of(slowAndFragileOperation);
 
@@ -1131,7 +1160,7 @@ class ReaderSpecs {
     }
 
     // NB! Ad-hoc experimentations
-    //@Test
+    @Test
     void shouldHaveReadersAsSequenceElements() {
         System.out.println("Declaring the monoid (for some computational structure)...");
         FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
@@ -1154,7 +1183,7 @@ class ReaderSpecs {
 
         System.out.println();
         System.out.println("Building deferred computational structure...");
-        Supplier<Integer> slowAndFragileOperationAsSupplier = delayedRandomNumberOrBottomSupplier;
+        Supplier<Integer> slowAndFragileOperationAsSupplier = delayedRandomIntegerOrBottomSupplier;
         Reader<Integer> slowAndFragileOperation = Reader.of(slowAndFragileOperationAsSupplier);
         Sequence<Reader<Integer>> seqOfLazyAndFragileIntegers = Sequence.of(
             slowAndFragileOperation,
@@ -1198,7 +1227,7 @@ class ReaderSpecs {
     @Test
     void toEither_whenMappingToBottomAsRuntimeException_shouldReturnLeft() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .map((integer) -> {
                 throw new RuntimeException();
             });
@@ -1210,7 +1239,7 @@ class ReaderSpecs {
     @Test
     void toEither_whenMappingToBottomAsNull_shouldReturnLeft() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .map((integer) -> null);
 
         assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
@@ -1220,7 +1249,7 @@ class ReaderSpecs {
     @Test
     void toEither_whenBindingToBottomAsRuntimeException_shouldReturnLeft() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
                     () -> { throw new RuntimeException(); }
@@ -1234,7 +1263,7 @@ class ReaderSpecs {
     @Test
     void toEither_whenBindingToBottomAsNull_shouldReturnLeft() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
                     () -> null
@@ -1248,7 +1277,7 @@ class ReaderSpecs {
     @Test
     void toEither_whenMapping_shouldReturnRight() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .map((integer) -> integer + 1);
 
         Either<String, Integer> maybeInteger = lazyHelloWorldLengthIsEvenNumber.toEither();
@@ -1265,7 +1294,7 @@ class ReaderSpecs {
     @Test
     void toMaybe_whenMappingToBottomAsRuntimeException_shouldReturnNothing() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .map((integer) -> {
                 throw new RuntimeException();
             });
@@ -1276,7 +1305,7 @@ class ReaderSpecs {
     @Test
     void toMaybe_whenMappingToBottomAsNull_shouldReturnNothing() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .map((integer) -> null);
 
         assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
@@ -1285,7 +1314,7 @@ class ReaderSpecs {
     @Test
     void toMaybe_whenBindingToBottomAsRuntimeException_shouldReturnNothing() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
                     () -> { throw new RuntimeException(); }
@@ -1298,7 +1327,7 @@ class ReaderSpecs {
     @Test
     void toMaybe_whenBindingToBottomAsNull_shouldReturnNothing() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
                     () -> null
@@ -1311,7 +1340,7 @@ class ReaderSpecs {
     @Test
     void toMaybe_whenMapping_shouldReturnJust() {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
-            .of(randomNumberSupplier)
+            .of(randomIntegerSupplier)
             .map((integer) -> integer + 1);
 
         Maybe<Integer> maybeInteger = lazyHelloWorldLengthIsEvenNumber.toMaybe();

@@ -78,14 +78,14 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     /**
      * Just for having a {@link Maybe} instance to reach the member methods, e.g. <code>pure</code>.
      */
-    public static <T> Maybe<T> withMaybe() {
-        return withMaybe(null);
+    public static <T> Maybe<T> asMaybe() {
+        return asMaybe(null);
     }
 
     /**
      * Just for having a (typed) {@link Maybe} instance to reach the member methods, e.g. <code>pure</code>.
      */
-    public static <T> Maybe<T> withMaybe(Class<T> type) {
+    public static <T> Maybe<T> asMaybe(Class<T> type) {
         return nothing();
     }
 
@@ -177,7 +177,7 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     ///////////////////////////////////////////////////////////////////////////
 
     @Override
-    public <U> Maybe<U> map(Function<? super T, ? extends U> function) {
+    public <V> Maybe<V> map(Function<? super T, ? extends V> function) {
         Arguments.requireNotNull(function, "'function' argument cannot be null");
         //return isNothing()
         //    ? nothing()
@@ -350,12 +350,12 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      *
      * @param onNothing Supplier ("nullary" function/deferred constant) of the default value in case it is 'Nothing'
      * @param onJust    Function (unary) (the "catamorphism") to be applied to this functor's value in case it is a 'Just'
-     * @param <U>       The type of the folded/returning value
+     * @param <V>       The type of the folded/returning value
      * @return the folded value
      */
-    public <U> U fold(
-        Supplier<U> onNothing,
-        Function<? super T, ? extends U> onJust
+    public <V> V fold(
+        Supplier<V> onNothing,
+        Function<? super T, ? extends V> onJust
     ) {
         return this.value.fold(onNothing, onJust);
     }

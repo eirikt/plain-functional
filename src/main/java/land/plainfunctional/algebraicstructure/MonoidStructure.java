@@ -65,6 +65,20 @@ public class MonoidStructure<T> extends FreeMonoid<T> {
     }
 
     /**
+     * @return 'true' if this monoid's set contains no elements, otherwise 'false'
+     */
+    public boolean isEmpty() {
+        return size() < 1;
+    }
+
+    /**
+     * @return the number of elements in this monoid's set of values
+     */
+    public long size() {
+        return this.set.size();
+    }
+
+    /**
      * <p>
      * To <i>fold</i> a value (e.g. a monoid) means creating a new representation of it.
      * </p>

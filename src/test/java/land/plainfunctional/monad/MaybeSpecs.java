@@ -20,7 +20,7 @@ import static java.lang.String.format;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.monad.Maybe.of;
-import static land.plainfunctional.monad.Maybe.withMaybe;
+import static land.plainfunctional.monad.Maybe.asMaybe;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
 import static land.plainfunctional.testdomain.vanillaecommerce.Person.Gender.MALE;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -232,14 +232,14 @@ class MaybeSpecs {
 
     @Test
     void shouldPutValuesInThisApplicativeFunctor() {
-        Maybe<?> maybe = withMaybe().pure("JustDoIt");
+        Maybe<?> maybe = Maybe.asMaybe().pure("JustDoIt");
 
         assertThat(maybe.tryGet()).isEqualTo("JustDoIt");
     }
 
     @Test
     void shouldPutTypedValuesInThisApplicativeFunctor() {
-        Maybe<LocalDate> maybe = withMaybe(LocalDate.class).pure(LocalDate.of(2010, 10, 13));
+        Maybe<LocalDate> maybe = asMaybe(LocalDate.class).pure(LocalDate.of(2010, 10, 13));
 
         assertThat(maybe.tryGet()).isEqualTo(LocalDate.of(2010, 10, 13));
     }
@@ -344,7 +344,7 @@ class MaybeSpecs {
         assertThat(maybeSum.tryGet()).isEqualTo(1 + 2 + 3 + 4);
 
         // Or as applicative functor all the way
-        maybeSum = withMaybe(Integer.class)
+        maybeSum = asMaybe(Integer.class)
             .pure(1)
             .apply(just(curriedPlus.apply(2)))
             .apply(just(curriedPlus.apply(3)))
@@ -375,7 +375,7 @@ class MaybeSpecs {
 
         assertThatThrownBy(
             () ->
-                withMaybe(Integer.class)
+                asMaybe(Integer.class)
                     .pure(1)
                     .apply(just(curriedPlus.apply(2)))
                     .apply(just(curriedPlus.apply(3)))

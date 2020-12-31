@@ -51,8 +51,8 @@ public interface Functor<T> {
      * and all this is the definition of the "map" function.
      *
      * @param function The map function
-     * @param <U>      The type of the codomain
+     * @param <V>      The type of the codomain
      * @return the new/other functor
      */
-    <U> Functor<U> map(Function<? super T, ? extends U> function);
+    <V> Functor<V> map(Function<? super T, ? extends V> function);
 }
