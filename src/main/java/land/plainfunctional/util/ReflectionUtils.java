@@ -12,8 +12,8 @@ public class ReflectionUtils {
         try {
             return type.newInstance();
 
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
+        } catch (Exception exception) {
+            throw new RuntimeException(exception);
         }
     }
 }

@@ -12,12 +12,10 @@ import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
 /**
- * <p>
  * <i>Functor context:</i>
  * <b>
- * The value may or may not be present.
+ * The value may or may not be present
  * </b>
- * </p>
  *
  * <p>
  * Haskell type definition:<br><br>

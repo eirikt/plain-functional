@@ -76,7 +76,7 @@ public interface Monad<T> extends Applicative<T> {
      * </p>
      *
      * <p>
-     * The default implementation of <code>bind</code> (generally speaking, and in this library) is <code>map(function).join()</code>,
+     * The default implementation of <code>bind</code> (generally speaking, and in this library) is <i>join ∘ map</i> ⇔ <code>map(function).join()</code>,
      * as that can be derived from the type definitions.
      * </p>
      *

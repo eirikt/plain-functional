@@ -10,14 +10,12 @@ import land.plainfunctional.util.Arguments;
 import land.plainfunctional.value.AbstractProtectedValue;
 
 /**
- * <p>
  * <i>Functor context:</i>
  * <b>
- * The value is either of the two given types.
- * The left-situated type is treated as the exceptional one.
+ * The value is either of the two given types
  * </b><br>
- * So alternatively, the functor context may be interpreted as "a value, or something else".
- * </p>
+ * The left-situated type is treated as the exceptional one,
+ * so alternatively, the functor context may be interpreted as "a value, or something else".
  *
  * <p>
  * Haskell type definition:<br><br>

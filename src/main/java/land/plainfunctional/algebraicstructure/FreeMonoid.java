@@ -7,6 +7,7 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import land.plainfunctional.monad.Promise;
 import land.plainfunctional.monad.Reader;
 import land.plainfunctional.util.Arguments;
 
@@ -76,7 +77,7 @@ public class FreeMonoid<T> {
     public final BinaryOperator<T> binaryOperation;
 
     /**
-     * This monoid's identity element.
+     * This monoid's identity element/value.
      */
     public final T identityElement;
 
@@ -211,9 +212,16 @@ public class FreeMonoid<T> {
     }
 
     /**
-     * @return a {@link Reader} version of this monoid's identity element
+     * @return a (deferred) {@link Reader} version of this monoid's identity element
      */
     public Reader<T> toReaderIdentity() {
-        return Reader.startingWith(this.identityElement);
+        return Reader.of(() -> this.identityElement);
+    }
+
+    /**
+     * @return a (deferred) {@link Promise} version of this monoid's identity element
+     */
+    public Promise<T> toPromiseIdentity() {
+        return Promise.of(() -> this.identityElement);
     }
 }
