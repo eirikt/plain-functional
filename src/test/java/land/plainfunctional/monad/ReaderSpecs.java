@@ -5,6 +5,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -25,6 +27,7 @@ import static java.lang.Integer.sum;
 import static java.lang.String.format;
 import static java.time.Duration.between;
 import static java.time.Instant.now;
+import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
@@ -128,10 +131,18 @@ public class ReaderSpecs {
         );
     }
 
+
     public static Integer getDelayedInteger(Integer integer) {
+        return getDelayedInteger(
+            1000,
+            integer
+        );
+    }
+
+    public static Integer getDelayedInteger(Integer delayInMilliseconds, Integer integer) {
         return getDelayedOrTimedOutInteger(
             null,
-            1000,
+            delayInMilliseconds,
             integer
         );
     }
@@ -209,9 +220,16 @@ public class ReaderSpecs {
     }
 
     public static String getDelayedString(String string) {
+        return getDelayedString(
+            1000,
+            string
+        );
+    }
+
+    public static String getDelayedString(Integer delayInMillisecond, String string) {
         return getDelayedOrTimedOutString(
             null,
-            1000,
+            delayInMillisecond,
             string
         );
     }
@@ -563,7 +581,7 @@ public class ReaderSpecs {
         String value = "Go";
 
         // m (Data constructor)
-        Function<String, Reader<String>> m = Reader::startingWith;
+        Function<String, Reader<String>> m = Reader::of;
 
         // m a
         Reader<String> m_a = m.apply(value);
@@ -787,7 +805,7 @@ public class ReaderSpecs {
 
     // NB! Ad-hoc experimentations
     @Test
-    void shouldFoldDifferentStructures() {
+    void shouldFoldVariousStructures() {
 
         // Sequence<Integer>
         System.out.println();
@@ -1219,6 +1237,60 @@ public class ReaderSpecs {
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
     }
 
+    /* TODO: Consider:
+    // NB! Ad-hoc experimentations
+    @Test
+    void shouldDoMapFold() {
+        Instant start = Instant.now();
+
+        //AtomicInteger counter = new AtomicInteger(0);
+        final AtomicLong mark1 = new AtomicLong(0L);
+        final AtomicLong mark2 = new AtomicLong(0L);
+        final AtomicLong mark3 = new AtomicLong(0L);
+        final AtomicLong mark4 = new AtomicLong(0L);
+        final AtomicLong mark5 = new AtomicLong(0L);
+
+        FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
+
+        System.out.printf("%n%s%n",
+            Reader
+                .of(getDelayedString("Hello"))
+                //.effect((string) -> mark1.set(between(start, now()).toMillis()))
+                //.effect((string) -> printInfo(start, counter, string))
+                .mapFold(
+                    asList(
+                        (string) -> getDelayedInteger(string.length()),
+                        (string) -> getDelayedInteger(string.length()),
+                        (string) -> getDelayedInteger(string.length())
+                    )
+                    , monoid
+                )
+            //.effect((string) -> mark2.set(between(start, now()).toMillis()))
+            //.effect((integer) -> printInfo(start, counter, integer))
+            //.evaluate() // Start async evaluation
+            //.effect((string) -> mark3.set(between(start, now()).toMillis()))
+            //.effect((integer) -> printInfo(start, counter, integer))
+            //.effect((integer) -> sleep(800, MILLISECONDS))
+            //.effect((string) -> mark4.set(between(start, now()).toMillis()))
+            //.effect((integer) -> printInfo(start, counter, integer))
+            //.effect((integer) -> sleep(300, MILLISECONDS))
+            //.effect((string) -> mark5.set(between(start, now()).toMillis()))
+            //.effect((integer) -> printInfo(start, counter, integer))
+            // NB! Blocks current thread! (BUT PICKING UP ON THE ONGOING ASYNC EVALUATION! :-)
+            //.toMaybe()
+            //.tryGet()
+
+        ).printf("%n(took %d ms) (should take 1000 + 1000 + ~100 ms)%n", between(start, now()).toMillis());
+
+        assertThat(mark1.get()).isLessThan(1100); // ~100 ms in max computational startup "overhead"
+        assertThat(mark2.get()).isLessThan(1100);
+        assertThat(mark3.get()).isLessThan(1100);
+        assertThat(mark4.get()).isLessThan(1100 + 800);
+        assertThat(mark5.get()).isLessThan(1100 + 800 + 300);
+        assertThat(between(start, now()).toMillis()).isLessThan(1000 + 1000 + 400); // ~400 ms in max total computational "overhead"
+    }
+    */
+
 
     ///////////////////////////////////////////////////////////////////////////
     // toEither, handling of bottom values (in deferred computations), including a failure reason message
@@ -1229,11 +1301,11 @@ public class ReaderSpecs {
         Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
             .of(randomIntegerSupplier)
             .map((integer) -> {
-                throw new RuntimeException();
+                throw new RuntimeException("Went south!");
             });
 
         assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isNull();
+        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("Went south!");
     }
 
     @Test
@@ -1252,12 +1324,12 @@ public class ReaderSpecs {
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
-                    () -> { throw new RuntimeException(); }
+                    () -> { throw new RuntimeException("Went south!"); }
                 )
             );
 
         assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isNull();
+        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("Went south!");
     }
 
     @Test

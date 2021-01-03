@@ -1,44 +1,50 @@
 package land.plainfunctional.monad;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.function.Supplier;
+
+import org.apache.commons.lang3.builder.ToStringBuilder;
 
 import land.plainfunctional.typeclass.Applicative;
 import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
-import land.plainfunctional.value.AbstractProtectedValue;
 
 import static java.util.function.Function.identity;
 import static land.plainfunctional.util.ReflectionUtils.createDefaultInstance;
+import static org.apache.commons.lang3.builder.ToStringStyle.SHORT_PREFIX_STYLE;
+import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCause;
+import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCauseMessage;
 
 /**
- * <p>
  * <i>Functor context:</i>
  * <b>
- * A deferred ("lazy-evaluated") value
+ * A deferred ("lazy-evaluated") value ⇒ a function.
  * </b><br>
  * The value is typically <i>read</i> from an external/shared environment, and may be arbitrary (neither <i>total</i> nor <i>deterministic</i>).
  * When evaluated (folded), the value will appear after an arbitrary amount of time.
  * Also, the value may not show up at all&mdash;like
  * {@link Either} and {@link Maybe}, the {@link Reader} context represents <a href="https://en.wikipedia.org/wiki/Partial_function">partiality</a>.
- * </p>
  *
  * <p>
  * Reader monads are functions from an shared environment to a value,
- * making it possible to bind variables to external sources.
- * In this implementation, <code>Reader</code> monads are composable "nullary" functions.
- * The {@link Supplier} which must be provided via the constructor, represents the "nullary" function.
+ * making it possible to bind variables to external sources, for composition.
+ * In this implementation, <code>Reader</code> monads are composable functions.
+ * The {@link Supplier} which must be provided via the constructor, represents the "nullary" starting function.
  * Composing <code>Reader</code> functors (via <code>map</code>) is the same as <a href="https://en.wikipedia.org/wiki/Function_composition">function composition</a>.
  * </p>
  *
  * <p>
- * Do notice; When evaluated, {@link Reader} instances will <i>"stop the world" (blocking the thread)</i>,
+ * Do notice; When evaluated, {@link Reader} instances will <i>"stop the world" (blocking the current thread)</i>,
  * while waiting for the value to be read from the environment.<br>
  * An (attempt on an) analogy might be a dinner recipe that you write yourself.
  * After composing it and listing up the ingredients, perhaps sorted by the most important ingredient&mdash;you
  * go out and fetch them yourself, one by one.<br>
  * So, <b>the {@link Reader} monad represents <i>synchronous</i> execution.</b>
- * (For <i>asynchronous</i> computations, the planned <code>Promise</code> monad must be used.)
+ * (For <i>asynchronous</i> computations, use <code>Promise</code>s.)
  * </p>
  *
  * <p>
@@ -48,7 +54,7 @@ import static land.plainfunctional.util.ReflectionUtils.createDefaultInstance;
  * @param <T> The type of the deferred value
  * @see <a href="https://bartoszmilewski.com/2015/01/20/functors/">Functors → The Reader Functor</a>
  */
-public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Monad<T> {
+public class Reader<T> implements Monad<T>, Future<T> {
 
     ///////////////////////////////////////////////////////////////////////////
     // Factory methods
@@ -58,28 +64,23 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
      * Just for having a {@link Reader} instance to reach the member methods, e.g. <code>pure</code>.
      * <b>NB! The given type must have an available empty constructor.</b>
      */
-    //@SuppressWarnings("unchecked")
     public static <T> Reader<T> asReader(Class<T> type) {
-        return startingWith(createDefaultInstance(type));
+        return of(() -> createDefaultInstance(type));
     }
 
     /**
-     * Alias for 'of(alreadyAvailableValue)'
+     * Factory method for immediately available values.
+     *
+     * @param value The supplied value to be put into this {@link Reader} functor
+     * @return A {@link Reader} value
      */
     public static <T> Reader<T> startingWith(T value) {
         return of(() -> value);
     }
 
-    /* TODO: To Be removed, I guess
-     * Factory method.
-     *
-     * @param value The (already available) value to be put into this {@link Reader} functor
-     * @return A {@link Reader} value
-     /
-    public static <T> Reader<T> of(T value) {
+    static <T> Reader<T> of(T value) {
         return Reader.of(() -> value);
     }
-    */
 
     /**
      * Factory method.
@@ -102,8 +103,8 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
     ///////////////////////////////////////////////////////////////////////////
 
     protected Reader(Supplier<T> supplier) {
-        super(supplier);
         Arguments.requireNotNull(supplier, "'Reader' cannot handle 'null' suppliers");
+        this.promise = Promise.of(supplier);
     }
 
 
@@ -111,10 +112,42 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
     // State
     ///////////////////////////////////////////////////////////////////////////
 
+    protected Promise<T> promise;
+
 
     ///////////////////////////////////////////////////////////////////////////
     // Methods
     ///////////////////////////////////////////////////////////////////////////
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Future
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Override
+    public boolean isDone() {
+        return this.promise.isDone();
+    }
+
+    @Override
+    public boolean isCancelled() {
+        return this.promise.isCancelled();
+    }
+
+    @Override
+    public T get() throws InterruptedException, ExecutionException {
+        return this.promise.get();
+    }
+
+    @Override
+    public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+        return this.promise.get(timeout, unit);
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+        return this.promise.cancel(mayInterruptIfRunning);
+    }
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -151,19 +184,41 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
      *
      * @param function     The map function
      * @param defaultValue If present (not <code>null</code>),
-     *                     this parameter will be returned in case of this reader returns a bottom value.
-     *                     (This is accomplished by transforming this reader to a maybe.)
+     *                     this parameter will be used as the mapping value if this {@link Reader} returns a bottom value.
+     *                     (This is accomplished by transforming this {@link Reader} to a {@link Maybe}.)
      * @param <V>          The type of the codomain
      * @return the new/other functor
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
      */
-    public <V> Reader<V> map(Function<? super T, ? extends V> function, T defaultValue) {
+    public <V> Reader<V> map(
+        Function<? super T, ? extends V> function,
+        T defaultValue
+    ) {
         Arguments.requireNotNull(function, "'function' argument cannot be null");
         return new Reader<>(
             () -> defaultValue == null
-                ? function.apply(this.value.get())
+                ? function.apply(this.promise.tryGet())
                 : function.apply(toMaybe().getOrDefault(defaultValue))
         );
     }
+
+    /* TODO: Consider:
+    public <V> Reader<Maybe<V>> map(
+        Function<? super T, ? extends V> function,
+        T defaultValue
+    ) {
+        throw new UnsupportedOperationException("Not yet implemented");
+    }
+    */
+
+    /* TODO: Consider:
+    public <V> Reader<V> map(
+        List<Function<? super T, ? extends V>> functorList,
+        FreeMonoid<V> monoid
+    ) {
+        return new Reader<>(() -> mapFold(functorList, monoid));
+    }
+    */
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -185,7 +240,7 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
             (Reader<Function<? super T, ? extends V>>) functionInContext;
 
         return new Reader<>(
-            () -> readerFunction.tryGet().apply(this.value.get())
+            () -> readerFunction.tryGet().apply(this.promise.tryGet())
         );
     }
 
@@ -199,11 +254,11 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
     public Reader<T> join() {
         return new Reader<>(
             () -> {
-                T value = this.value.get();
+                T value = this.promise.tryGet();
 
                 if (value instanceof Reader<?>) {
                     // @SuppressWarnings: 'this.value' is an instance of 'Reader' and must be of type 'T'
-                    return ((Reader<T>) value).value.get();
+                    return ((Reader<T>) value).promise.tryGet();
                 }
                 return value;
             }
@@ -284,10 +339,10 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
             numberOfRetries,
             (exception) -> {
                 System.err.printf(
-                    "Reader evaluation failed, returning 'Either.Left'/'Maybe.Nothing', reason:%n%s%n",
-                    exception.getMessage()
+                    "'Reader::toEitherWithRetry' FAILED, returning 'Either.Left'/'Maybe.Nothing'. Reason: %s%n",
+                    getRootCauseMessage(exception)
                 );
-                return Either.left(exception.getMessage());
+                return Either.left(getRootCause(exception).getMessage());
             },
             Either::right
         );
@@ -307,7 +362,7 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
      * This method is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
      * </p>
      *
-     * @return this functor's value in case of successful evaluation/computation, otherwise return the bottom value representation
+     * @return this functor's value in case of successful evaluation/computation, otherwise return the bottom value representation, here an {@link Exception}
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
      */
     public T tryGet() {
@@ -351,7 +406,7 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
      * As {@link Reader} is a single-value functor, there is no need for a <i>binary</i> function;
      * It is replaced by an unary function, which transforms the single read value.
      * Also, the need for an initial value is redundant;
-     * It is replaced by a special unary function in case this {@link Reader} return a bottom value, here an exception, which is provided as the function parameter.
+     * It is replaced by a special unary function in case this {@link Reader} return a bottom value, here an {@link Exception}, which is provided as the function parameter.
      * </p>
      *
      * @param onRead Function (unary) (the "catamorphism") to be applied to the read value
@@ -482,47 +537,52 @@ public class Reader<T> extends AbstractProtectedValue<Supplier<T>> implements Mo
     ) {
         try {
             // NB! Blocks current thread!
-            return onRead.apply(this.value.get());
+            return onRead.apply(get());
 
         } catch (Exception exception) {
             if (retryIndex > 0) {
                 System.out.printf(
-                    "'Reader.fold' evaluation failed, retrying... (%d/%d)%n",
+                    "'Reader::foldWithRetry' FAILED, retrying... (%d/%d)%n",
                     retryIndex - 1, totalNumberOfRetries
                 );
                 return foldWithRetry(retryIndex - 1, totalNumberOfRetries, onBottom, onRead);
             }
             System.err.printf(
-                "'Reader.fold' evaluation failed, executing 'onBottom' 'Supplier' (\"nullary\" function): reason:%n%s%n",
-                exception.getMessage()
+                "'Reader::foldWithRetry' FAILED, executing 'onBottom' 'Supplier' (\"nullary\" function). Reason: %s%n",
+                getRootCauseMessage(exception)
             );
             return onBottom.apply(exception);
         }
     }
 
+    /* TODO: Consider:
+    public <V> V mapFold(
+        List<Function<? super T, ? extends V>> functorList,
+        FreeMonoid<V> monoid
+    ) {
+        if (isCancelled()) {
+            throw new CancellationException();
+        }
+        try {
+            return Promise.mapFold(get(), functorList, monoid);
+
+        } catch (Exception exception) {
+            throw new RuntimeException(exception);
+        }
+    }
+    */
+
 
     ///////////////////////////////////////////////////////////////////////////
     // java.lang.Object
-    //
-    // NB! Must step back to Object.hashCode and Object.equals()
-    // for avoiding throwing away 'Reader' instances e.g. in 'Set' semantics
     ///////////////////////////////////////////////////////////////////////////
 
     @Override
-    public int hashCode() {
-        return System.identityHashCode(this);
-    }
-
-    @Override
-    public boolean equals(Object other) {
-        if (this == other) {
-            return true;
-        }
-        if (other == null || getClass() != other.getClass()) {
-            return false;
-        }
-        Reader<?> otherReader = (Reader<?>) other;
-
-        return this.hashCode() == otherReader.hashCode();
+    public String toString() {
+        return ToStringBuilder
+            .reflectionToString(this,
+                SHORT_PREFIX_STYLE,
+                true
+            );
     }
 }

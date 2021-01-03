@@ -721,8 +721,7 @@ public class Promise<T> implements Monad<T>, Future<T> {
     /**
      * This method is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
      *
-     * @return this functor's value in case of successful evaluation/computation, otherwise return the bottom value representation
-     * @throws RuntimeException if <code>fold</code> methods throws exception
+     * @return this functor's value in case of successful evaluation/computation, otherwise return the bottom value representation, here an {@link Exception}
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
      */
     public T tryGet() {
