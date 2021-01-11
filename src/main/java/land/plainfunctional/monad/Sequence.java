@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -20,13 +21,13 @@ import land.plainfunctional.typeclass.Applicative;
 import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
 
+import static java.lang.Runtime.getRuntime;
+
 /**
- * <p>
  * <i>Functor context:</i>
  * <b>
  * Contains none, one, or many enumerated (possible duplicated) values
  * </b>
- * </p>
  *
  * <p>
  * Sequences is also known as <i>lists</i>.
@@ -35,9 +36,10 @@ import land.plainfunctional.util.Arguments;
  *
  * <p>
  * The contained values are also known as <i>elements</i> or <i>items</i> (of the sequence/list).
+ * <code>null</code>s (and other forms of bottom value representations) are not allowed in (mathematical) sequences.
  * </p>
  *
- * @param <T> The type of the values in the sequence
+ * @param <T> The type of the sequence elements/values
  * @see <a href="https://en.wikipedia.org/wiki/Sequence">Mathematical sequences</a>
  * @see <a href="https://en.wikipedia.org/wiki/List_(abstract_data_type)">List (abstract data type)</a>
  */
@@ -111,7 +113,11 @@ public class Sequence<T> implements Monad<T> {
 
     protected Sequence(T value) {
         this();
+
+        // TODO: Is this too strict?
+        // => So far, it works as a fail-fast policy...
         Arguments.requireNotNull(value, "'Sequence' cannot contain 'null' values");
+
         this.values.add(value);
     }
 
@@ -120,7 +126,10 @@ public class Sequence<T> implements Monad<T> {
     protected Sequence(T... values) {
         this();
         for (T value : values) {
+            // TODO: Is this too strict (and inefficient?)
+            // => So far, it works as a fail-fast policy...
             Arguments.requireNotNull(value, "'Sequence' cannot contain 'null' values");
+
             this.values.add(value);
         }
     }
@@ -128,7 +137,10 @@ public class Sequence<T> implements Monad<T> {
     protected Sequence(Iterable<? extends T> iterable) {
         this();
         for (T value : iterable) {
+            // TODO: Is this too strict (and inefficient?)
+            // => So far, it works as a fail-fast policy...
             Arguments.requireNotNull(value, "'Sequence' cannot contain 'null' values");
+
             this.values.add(value);
         }
     }
@@ -161,18 +173,113 @@ public class Sequence<T> implements Monad<T> {
     public <V> Sequence<V> map(Function<? super T, ? extends V> function) {
         List<V> mappedValues = new ArrayList<>(this.values.size());
         for (T value : this.values) {
-            V mappedValue = function.apply(value);
+            try {
+                V mappedValue = function.apply(value);
 
-            // Partial function handling:
-            // NB! Skipping inclusion as mapped value has no representation in the codomain
-            if (mappedValue == null) {
-                System.err.printf("NB! 'Sequence::map': Skipping mapping! Value has no representation in the codomain (%s)%n", value);
-                continue;
+                // Partial function handling I:
+                // NB! Skipping inclusion as mapped value has no representation in the codomain
+                if (mappedValue == null) {
+                    System.err.printf("NB! 'Sequence::map': Skipping mapping! Value has no representation in the codomain (%s) (%s)%n", value, "'null'");
+                    continue;
+                }
+                mappedValues.add(mappedValue);
+
+            } catch (Exception exception) {
+                // Partial function handling II:
+                System.err.printf("NB! 'Sequence::map': Skipping mapping! Value has no representation in the codomain (%s) (%s)%n", value, exception);
             }
-
-            mappedValues.add(mappedValue);
         }
         return new Sequence<>(mappedValues);
+    }
+
+    /**
+     * The functor function.
+     *
+     * "Plain functionally" (Haskell-style), the functor function is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;map :: Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * NB! In Haskell this function is named <code>fmap</code>.
+     * </p>
+     *
+     * <i>This means</i>: A function <code>a -&gt; b</code> is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a container structure of the same type <code>f</code>containing elements of type <code>b</code>.<br>
+     *
+     * <i>This reads</i>: The map function "is a member of" Functor type <code>f</code> "having the type constraint" of;
+     * For an "<code>f</code> of <code>a</code>'s",
+     * and a function taking an <code>a</code> returning a <code>b</code>,
+     * it must return an "<code>f</code> of <code>b</code>'s"&mdash;
+     * and all this is the definition of the "map" function.
+     *
+     * <p>...</p>
+     *
+     * This is a variant of <code>map</code> that maps the elements/values in parallel.
+     * It is implemented by <i>first partitioning this sequence into sub-sequences based on the number of available logical processors</i>.
+     * These sub-sequences are then sequentially transformed from sequences of <code>T</code>-typed elements/values into a sequences of <code>Promise&lt;T&gt;</code>-typed elements/values,
+     * to which the mapping function is applied.
+     * Then all promises are evaluated simultaneously (in their own native threads), and then finally sequentially folded to <code>V</code>-typed elements/values,
+     * and added to a new <code>Sequence&lt;V&gt;</code>.
+     * Needless to say; This method brings some overhead.
+     * It uses the common static {@link java.util.concurrent.ForkJoinPool} (via the {@link Promise}'s {@link java.util.concurrent.CompletableFuture},
+     * so its efficiency depends on a lot of things:<br>
+     * <ul>
+     *     <li>the number of sequence elements/values</li>
+     *     <li>the nature of the mapping function&mdash;somewhat heavy, (pure) computational functions are good, while blocking tasks may obstruct other tasks using the common Fork/Join thread pool</li>
+     *     <li>the other activity in this JVM process and on this computer in general&mdash;CPUs are shared resources</li>
+     * </ul>
+     *
+     * @param function The map function
+     * @param <V>      The type of the codomain
+     * @return the new/other functor
+     * @see <a href="https://en.wikipedia.org/wiki/Hyper-threading">Logical cores (in hyper-threading)</a>
+     */
+    public <V> Sequence<V> parallelMap(Function<? super T, ? extends V> function) {
+        return parallelMap(function, getRuntime().availableProcessors() - 2);
+    }
+
+    protected <V> Sequence<V> parallelMap(Function<? super T, ? extends V> function, int numberOfElementsInEachPartition) {
+        Sequence<V> mappedSequence = Sequence.empty();
+        for (Sequence<T> subSequence : partition(numberOfElementsInEachPartition).values) {
+            mappedSequence = mappedSequence.append(subSequence.unconstrainedParallelMap(function));
+        }
+        return mappedSequence;
+    }
+
+    /**
+     * Mapping in parallel without partitioning.
+     */
+    protected <V> Sequence<V> unconstrainedParallelMap(Function<? super T, ? extends V> function) {
+        return
+            map(
+                (value) -> Promise
+                    .of(value)
+                    .map(function)
+                    .evaluate()
+            ).map(
+                (Function<Promise<? extends V>, V>) (mappedValuePromise) ->
+                    // NB! Blocks current thread while completing promise evaluation, one by one
+                    mappedValuePromise.fold(
+                        (exception) -> {
+                            // Partial function handling I:
+                            System.err.printf("NB! 'Sequence::parallelMap': Skipping mapping! Bottom value has no representation in the codomain (%s)%n", exception.getMessage());
+                            return null;
+                        },
+                        (mappedValue) -> {
+                            // Partial function handling II:
+                            if (mappedValue == null) {
+                                System.err.printf("NB! 'Sequence::parallelMap': Skipping mapping! Bottom value has no representation in the codomain (%s)%n", "'null'");
+                                return null;
+                            }
+                            return mappedValue;
+                        }
+                    )
+            ).filter(
+                Objects::nonNull
+            );
     }
 
 
@@ -369,50 +476,6 @@ public class Sequence<T> implements Monad<T> {
      * Do notice that the <i>first</i> 'append' parameter acts as the accumulated value while folding.
      * </p>
      *
-     * @param monoid The same-type monoid used for folding this sequence
-     * @return the folded value
-     */
-    public T foldLeft(FreeMonoid<T> monoid) {
-        return foldLeft(
-            monoid.identityElement,
-            monoid.binaryOperation
-        );
-    }
-
-    /**
-     * <p>
-     * To <i>fold</i> a value means creating a new representation of it.
-     * </p>
-     *
-     * <p>
-     * In abstract algebra, this is known as a <i>catamorphism</i>.
-     * A catamorphism deconstructs (destroys) data structures
-     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
-     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
-     * </p>
-     *
-     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
-     * <p>
-     * <code>
-     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
-     * </code>
-     * </p>
-     *
-     * <p>
-     * <i>This means</i>:
-     * A binary function <code>b -&gt; a -&gt; b</code>,
-     * together with an initial value of type <code>b</code>,
-     * is applied to a functor <code>f</code> of type <code>a</code>,
-     * returning a new value of type<code>b</code>.
-     * </p>
-     *
-     * <p>
-     * "Left fold"/"Fold-left" starts with the identity value,
-     * and appends/adds the left-most (first) element in this sequence,
-     * and then appends/adds the rest of the elements "going to the right".
-     * Do notice that the <i>first</i> 'append' parameter acts as the accumulated value while folding.
-     * </p>
-     *
      * @param identityValue The identity value, acting as the initial value of this fold operation
      * @param catamorphism  The fold function
      * @param <V>           The type of the folded/returning value
@@ -431,50 +494,6 @@ public class Sequence<T> implements Monad<T> {
             foldedValue = catamorphism.apply(foldedValue, value);
         }
         return foldedValue;
-    }
-
-    /**
-     * <p>
-     * To <i>fold</i> a value means creating a new representation of it.
-     * </p>
-     *
-     * <p>
-     * In abstract algebra, this is known as a <i>catamorphism</i>.
-     * A catamorphism deconstructs (destroys) data structures
-     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
-     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
-     * </p>
-     *
-     * "Plain functionally" (Haskell-style), "foldright" (<code>foldr</code>) is defined as:
-     * <p>
-     * <code>
-     * &nbsp;&nbsp;&nbsp;&nbsp;foldr :: (a -&gt; b -&gt; b) -&gt; b -&gt; f a -&gt; b
-     * </code>
-     * </p>
-     *
-     * <p>
-     * <i>This means</i>:
-     * A binary function <code>a -&gt; b -&gt; b</code>,
-     * together with an initial value of type <code>b</code>,
-     * is applied to a functor <code>f</code> of type <code>a</code>,
-     * returning a new value of type<code>b</code>.
-     * </p>
-     *
-     * <p>
-     * "Right fold"/"Fold-right" starts with the identity value,
-     * and appends/adds the right-most (first) element in this sequence,
-     * and then appends/adds the rest of the elements "going to the left".
-     * Do notice that the <i>second</i> 'append' parameter acts as the accumulated value while folding.
-     * </p>
-     *
-     * @param monoid The same-type monoid used for folding this sequence
-     * @return the folded value
-     */
-    public T foldRight(FreeMonoid<T> monoid) {
-        return foldRight(
-            monoid.identityElement,
-            monoid.binaryOperation
-        );
     }
 
     /**
@@ -534,31 +553,71 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
+    // Partition
+    ///////////////////////////////////////////////////////
+
+    /**
+     * Partition this promise based on the number of logical processors (hyper-threaded processor cores).
+     *
+     * @return the sequence chopped up in sub-sequences having the size of logical processors, minus two
+     */
+    protected Sequence<Sequence<T>> partition() {
+        return partition(getRuntime().availableProcessors() - 2);
+    }
+
+    /**
+     * Partition this promise into sub-sequences having the having the given size.
+     *
+     * @param numberOfElementsInEachPartition The number of elements/values in each sub-sequence
+     * @return the sequence chopped up in sub-sequences having the given size
+     */
+    protected Sequence<Sequence<T>> partition(int numberOfElementsInEachPartition) {
+        Sequence<Sequence<T>> partitionedSequence = null;
+        Sequence<T> subSequence = null;
+
+        int elementCounterWithinPartition = 0;
+
+        // TODO: Efficiency: Investigate the possibility using 'System.arrayCopy' or something in that ballpark ("Spliterators" even maybe)
+        for (T element : this.values) {
+            if (elementCounterWithinPartition % numberOfElementsInEachPartition == 0) {
+                partitionedSequence = (partitionedSequence == null)
+                    ? Sequence.empty()
+                    : partitionedSequence.append(subSequence);
+
+                subSequence = Sequence.empty();
+                elementCounterWithinPartition = 0;
+            }
+            if (elementCounterWithinPartition <= numberOfElementsInEachPartition) {
+                subSequence = subSequence.append(element);
+            }
+            elementCounterWithinPartition += 1;
+        }
+        partitionedSequence = partitionedSequence.append(subSequence);
+
+        return partitionedSequence;
+    }
+
+
+    ///////////////////////////////////////////////////////
     // Append
     ///////////////////////////////////////////////////////
 
     /**
-     * @param sequence1 the original sequence
-     * @param sequence2 a sequence, which elements will be appended to the first sequence parameter
-     * @return a new sequence, consisting of the first sequence's elements followed by the second sequences' elements
+     * @param iterable the values to be appended
+     * @return a new sequence, consisting of this sequence's elements followed by the values in the given {@link Iterable} parameter
      */
-    public static <T> Sequence<T> append(Sequence<T> sequence1, Sequence<T> sequence2) {
-        List<T> appendedList = sequence1.toJavaList();
-        appendedList.addAll(sequence2.values);
-
-        return new Sequence<>(appendedList);
+    public Sequence<T> append(Iterable<T> iterable) {
+        // TODO: Deliberately implemented with primary focus of readability/consistency, and not efficiency
+        return append(new Sequence<>(iterable));
     }
 
     /**
-     * @param sequence the original sequence
-     * @param value    the value to be appended
-     * @return a new sequence, consisting of the given sequence's elements followed by the given value
+     * @param value the value to be appended
+     * @return a new sequence, consisting of this sequence's elements followed by the given value
      */
-    public static <T> Sequence<T> append(Sequence<T> sequence, T value) {
-        List<T> appendedList = sequence.toJavaList();
-        appendedList.add(value);
-
-        return new Sequence<>(appendedList);
+    public Sequence<T> append(T value) {
+        // TODO: Deliberately implemented with primary focus of readability/consistency, and not efficiency
+        return append(Sequence.of(value));
     }
 
     /**
@@ -570,19 +629,15 @@ public class Sequence<T> implements Monad<T> {
     }
 
     /**
-     * @param iterable the values to be appended
-     * @return a new sequence, consisting of this sequence's elements followed by the values in the given {@link Iterable} parameter
+     * @param sequence1 the original sequence
+     * @param sequence2 a sequence, which elements will be appended to the first sequence parameter
+     * @return a new sequence, consisting of the first sequence's elements followed by the second sequences' elements
      */
-    public Sequence<T> append(Iterable<T> iterable) {
-        return append(new Sequence<>(iterable));
-    }
+    public static <T> Sequence<T> append(Sequence<T> sequence1, Sequence<T> sequence2) {
+        List<T> appendedList = sequence1.toJavaList();
+        appendedList.addAll(sequence2.values);
 
-    /**
-     * @param value the value to be appended
-     * @return a new sequence, consisting of this sequence's elements followed by the given value
-     */
-    public Sequence<T> append(T value) {
-        return append(this, value);
+        return new Sequence<>(appendedList);
     }
 
 

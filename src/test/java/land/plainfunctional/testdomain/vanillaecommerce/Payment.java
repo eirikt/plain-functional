@@ -10,11 +10,12 @@ import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
 import static java.lang.Integer.parseInt;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static land.plainfunctional.util.InstrumentationUtils.sleep;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.commons.lang3.RandomStringUtils.randomNumeric;
 import static org.apache.commons.lang3.RandomUtils.nextInt;
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.builder.ToStringBuilder.reflectionToString;
 
 /**
  * An immutable payment class.
@@ -30,7 +31,7 @@ public class Payment {
     public static Payment random() {
         String cardNumber = randomNumeric(4) + " " + randomNumeric(4) + " " + randomNumeric(4) + " " + randomNumeric(4);
         String cardHolderName = randomAlphabetic(2, 9) + " " + randomAlphabetic(2, 13);
-        YearMonth expirationMonth = YearMonth.of(2020 + nextInt(1, 7), nextInt(1, 13));
+        YearMonth expirationMonth = YearMonth.of(2022 + nextInt(1, 7), nextInt(1, 13));
         Integer cvc = parseInt(randomNumeric(3));
         Double amount = new BigDecimal(randomNumeric(2, 6) + "." + randomNumeric(1, 100))
             .setScale(2, RoundingMode.HALF_UP)
@@ -157,6 +158,9 @@ public class Payment {
      * @return the merged/appended/amended payment
      */
     public Payment append(Payment payment) {
+        // For testing parallel processing
+        sleep(10, MILLISECONDS);
+
         return new Payment(
             isBlank(this.cardNumber) ? payment.cardNumber : this.cardNumber,
             isBlank(this.cardHolderName) ? payment.cardHolderName : this.cardHolderName,

@@ -1,5 +1,6 @@
 package land.plainfunctional.monad;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -18,10 +19,14 @@ import land.plainfunctional.typeclass.Applicative;
 
 import static java.lang.Integer.sum;
 import static java.lang.String.format;
+import static java.lang.Thread.sleep;
+import static java.time.Duration.between;
+import static java.time.Instant.now;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
+import static land.plainfunctional.monad.ReaderSpecs.getDelayedInteger;
 import static land.plainfunctional.monad.Sequence.asSequence;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -1144,8 +1149,7 @@ class SequenceSpecs {
             });
         assertThat(mappedSequence2.isEmpty()).isFalse();
         assertThat(mappedSequence2.size()).isEqualTo(4);
-
-         */
+        */
     }
 
 
@@ -1164,6 +1168,35 @@ class SequenceSpecs {
 
         assertThat(mappedSequence.isEmpty()).isFalse();
         assertThat(mappedSequence.size()).isEqualTo(4);
+    }
+
+    @Test
+    void whenMappingToBottomValue_shouldIgnoreIt_1() {
+        Sequence<String> sequence = Sequence.of("one", "two", "three", "four");
+
+        assertThat(sequence.isEmpty()).isFalse();
+        assertThat(sequence.size()).isEqualTo(4);
+
+        Sequence<Integer> mappedSequence = sequence.map(
+            (string) -> {
+                throw new RuntimeException();
+            });
+
+        assertThat(mappedSequence.isEmpty()).isTrue();
+    }
+
+    @Test
+    void whenMappingToBottomValue_shouldIgnoreIt_2() {
+        Sequence<String> sequence = Sequence.of("one", "two", "three", "four");
+
+        assertThat(sequence.isEmpty()).isFalse();
+        assertThat(sequence.size()).isEqualTo(4);
+
+        Sequence<Integer> mappedSequence = sequence.map(
+            (string) -> null
+        );
+
+        assertThat(mappedSequence.isEmpty()).isTrue();
     }
 
     @Test
@@ -1190,6 +1223,79 @@ class SequenceSpecs {
         // => Reduction
         sum = list.stream().reduce(0, Integer::sum);
         assertThat(sum).isEqualTo(3 + 3 + 5 + 4);
+    }
+
+    @Test
+    void shouldParallelMap() {
+        Sequence<String> sequence = Sequence.of("Hello", " ", "World", "!");
+
+        Function<String, Integer> f = (string) -> getDelayedInteger(1000, string.length());
+
+        Instant start = Instant.now();
+
+        // One partition only
+        Sequence<Integer> mappedSequence = sequence.parallelMap(f, 4);
+
+        assertThat(between(start, now()).toMillis()).isLessThan(1000 + 50); // ~50 ms in max total computational "overhead"
+
+        assertThat(mappedSequence.size()).isEqualTo(4);
+        assertThat(mappedSequence.values.get(0)).isEqualTo(5);
+        assertThat(mappedSequence.values.get(1)).isEqualTo(1);
+        assertThat(mappedSequence.values.get(2)).isEqualTo(5);
+        assertThat(mappedSequence.values.get(3)).isEqualTo(1);
+    }
+
+    @Test
+    void shouldParallelMapByPartitioning() {
+        Sequence<Integer> sequence = Sequence.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18);
+
+        Function<Integer, Integer> f = (integer) -> {
+            try {
+                sleep(1000);
+                return integer + 1;
+
+            } catch (Exception exception) {
+                exception.printStackTrace(System.err);
+            }
+            return Integer.MIN_VALUE;
+        };
+
+        Instant start = Instant.now();
+
+        // Yields 4 partitions, 3 full and the last containing 3 elements
+        Sequence<Integer> mappedSequence = sequence.parallelMap(f, 5);
+
+        assertThat(between(start, now()).toMillis()).isLessThan(4 * 1000 + 100); // ~100 ms in max total computational "overhead"
+
+        assertThat(mappedSequence.size()).isEqualTo(18);
+        assertThat(mappedSequence.values.get(0)).isEqualTo(2);
+        assertThat(mappedSequence.values.get(mappedSequence.values.size() - 1)).isEqualTo(19);
+    }
+
+    @Test
+    void whenMappingToBottomValue_shouldIgnoreIt_3() {
+        Sequence<Integer> sequence = Sequence.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18);
+
+        Function<Integer, Integer> f = (integer) -> {
+            throw new RuntimeException();
+        };
+
+        // Yields 4 partitions, 3 full and the last containing 3 elements
+        Sequence<Integer> mappedSequence = sequence.parallelMap(f, 5);
+
+        assertThat(mappedSequence.isEmpty()).isTrue();
+    }
+
+    @Test
+    void whenMappingToBottomValue_shouldIgnoreIt_4() {
+        Sequence<Integer> sequence = Sequence.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18);
+
+        Function<Integer, Integer> f = (integer) -> null;
+
+        // Yields 4 partitions, 3 full and the last containing 3 elements
+        Sequence<Integer> mappedSequence = sequence.parallelMap(f, 5);
+
+        assertThat(mappedSequence.isEmpty()).isTrue();
     }
 
 
@@ -1392,10 +1498,10 @@ class SequenceSpecs {
         //long rangeSum = 6;
         //int range = 10;
         //long rangeSum = 55;
-        int range = 100;
-        long rangeSum = 5_050;
-        //int range = 1_000;
-        //long rangeSum = 500_500;
+        //int range = 100;
+        //long rangeSum = 5_050;
+        int range = 1_000;
+        long rangeSum = 500_500;
         //int range = 10_000;
         //long rangeSum = 50_005_000;
         //int range = 100_000;
@@ -1533,6 +1639,25 @@ class SequenceSpecs {
         System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values), processing took %d ms%n", between(startProcessing, now()).toMillis());
         assertThat(sequenceOfLongs.size()).isEqualTo(range); // 1-based
         assertThat(sum).isEqualTo(rangeSum);
+
+
+        // Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding)
+        startGenerating = now();
+        intSupplier = () -> {
+            Long[] intArray = new Long[range];
+            for (long i = 0; i < range; i += 1) {
+                intArray[(int) i] = i + 1;
+            }
+            return asList(intArray);
+        };
+        sequenceOfLongs = Sequence.of(intSupplier);
+        startProcessing = now();
+        sum = sequenceOfLongs.toMonoid(Long::sum, 0L).parallelFold();
+        System.out.println();
+        System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding), processing took %d ms%n", between(startProcessing, now()).toMillis());
+        assertThat(sequenceOfLongs.size()).isEqualTo(range); // 1-based
+        assertThat(sum).isEqualTo(rangeSum);
     }
     */
 
@@ -1540,8 +1665,7 @@ class SequenceSpecs {
     /* On-demand test
     @Test
     void shouldFoldProductTypes() {
-        //int range = 3;
-        int range = 100;
+        int range = 1_000;
 
         System.out.printf("Runtime.freeMemory: %d   Runtime.maxMemory: %d   Runtime.totalMemory: %d%n",
             Runtime.getRuntime().freeMemory(),
@@ -1549,7 +1673,7 @@ class SequenceSpecs {
             Runtime.getRuntime().totalMemory()
         );
 
-        BinaryOperator<Payment> append = Payment::append;
+        //BinaryOperator<Payment> append = Payment::append;
 
         Function<Payment, Function<Payment, Payment>> curriedAppend =
             (payment1) ->
@@ -1789,6 +1913,41 @@ class SequenceSpecs {
         );
 
 
+        // "Sum" of Payments: Plain functional Java [parallel folding II]
+        System.out.println();
+        System.out.printf("\"Sum\" of %d Payments: Plain functional Java [parallel folding II]%n", range);
+        startGenerating = now();
+        sequenceOfPayments = Sequence.empty();
+        firstRandomPayment = Payment.random();
+        for (long i = 1; i <= range; i += 1) {
+            if (i == 1) {
+                System.out.printf("First enumerated payment: %s%n", firstRandomPayment);
+                randomPayment = firstRandomPayment;
+            } else {
+                randomPayment = Payment.random();
+            }
+            sequenceOfPayments = sequenceOfPayments.append(randomPayment);
+        }
+
+        System.out.printf("Runtime.freeMemory: %d   Runtime.maxMemory: %d   Runtime.totalMemory: %d%n",
+            Runtime.getRuntime().freeMemory(),
+            Runtime.getRuntime().maxMemory(),
+            Runtime.getRuntime().totalMemory()
+        );
+
+        startProcessing = now();
+        payment = sequenceOfPayments.toMonoid(Payment.identity(), Payment::append).parallelFold();
+
+        System.out.printf("\"Sum\" of Payments: Plain functional Java [parallel folding II], generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("\"Sum\" of Payments: Plain functional Java [parallel folding II], processing took %d ms%n", between(startProcessing, now()).toMillis());
+        System.out.printf("Folded payment: %s%n", payment);
+        assertThat(sequenceOfPayments.size()).isEqualTo(range); // 1-based
+        assertThat(payment).isNotNull();
+        assertThat(payment.cardHolderName).isNotNull();
+        assertThat(payment.cardHolderName).isEqualTo(firstRandomPayment.cardHolderName);
+        assertThat(payment.expirationMonth).isGreaterThan(YearMonth.now());
+        assertThat(payment.expirationMonth).isEqualTo(firstRandomPayment.expirationMonth);
+        // ...
     }
     */
 }
