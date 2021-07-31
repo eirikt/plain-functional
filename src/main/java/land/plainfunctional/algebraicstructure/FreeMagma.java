@@ -30,7 +30,7 @@ import static java.util.Collections.emptySet;
  * <p>
  * <i>Disclaimer:</i><br>
  * Finding myself kind of on a limb when it comes to the theoretical concepts and terms regarding this algebraic <i>free</i> thingy...<br>
- * I think the use of it here is mostly viable... hope so.
+ * I think the use of it here is mostly correct... hope so.
  * </p>
  *
  * @param <T> The magma type, all values of this type belongs to the magma
@@ -72,8 +72,8 @@ public class FreeMagma<T> extends Magma<T> {
      */
     @Override
     public T append(T element1, T element2) {
-        Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");
-        Arguments.requireNotNull(element2, "'element2' argument cannot be 'null'");
+        Arguments.requireNotNull(element1, "'element1' argument cannot be null");
+        Arguments.requireNotNull(element2, "'element2' argument cannot be null");
 
         if (element1.equals(element2)) {
             throw new IllegalArgumentException("Cannot append two equal element values in a magma");

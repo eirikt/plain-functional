@@ -4,7 +4,6 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import land.plainfunctional.monad.Promise;
@@ -55,7 +54,7 @@ import land.plainfunctional.util.Arguments;
  * <p>
  * <i>Disclaimer:</i><br>
  * Finding myself kind of on a limb when it comes to the theoretical concepts and terms regarding this algebraic <i>free</i> thingy...<br>
- * I think the use of it here is mostly viable... hope so.
+ * I think the use of it here is mostly correct... hope so.
  * </p>
  *
  * @param <T> The monoid type, all values of this type belongs to the monoid
@@ -63,18 +62,7 @@ import land.plainfunctional.util.Arguments;
  * @see <a href="https://en.wikipedia.org/wiki/Identity_element">Identity element (Wikipedia)</a>
  * @see <a href="https://en.wikipedia.org/wiki/Free_monoid">Free monoid (Wikipedia)</a>
  */
-public class FreeMonoid<T> {
-
-    /**
-     * This monoids's binary operation.
-     *
-     * <p>
-     * The totality/closure property which the binary operation also must inhibit,
-     * is enforced via the single-parametric {@link BinaryOperator} class,
-     * in addition to constraints defined in the <code>append</code> method.
-     * </p>
-     */
-    public final BinaryOperator<T> binaryOperation;
+public class FreeMonoid<T> extends FreeSemigroup<T> {
 
     /**
      * This monoid's identity element/value.
@@ -89,14 +77,13 @@ public class FreeMonoid<T> {
         BinaryOperator<T> binaryOperation,
         T identityElement
     ) {
-        Arguments.requireNotNull(binaryOperation, "A monoid must have a binary operation");
+        super(binaryOperation);
         Arguments.requireNotNull(identityElement, "A monoid must have an identity element - a neutral element");
-        this.binaryOperation = binaryOperation;
         this.identityElement = identityElement;
     }
 
     /**
-     * @return a deferred ("nullary"/constant function) version of this monoid's identity elements
+     * @return a deferred ("nullary"/constant function/Reader) version of this monoid's identity element
      */
     public Supplier<T> deferredIdentity() {
         return
@@ -105,51 +92,7 @@ public class FreeMonoid<T> {
     }
 
     /**
-     * @return a curried version of this monoid's associative, closed, binary operation
-     */
-    public Function<T, Function<T, T>> curriedBinaryOperation() {
-        return
-            (arg1) ->
-                (arg2) ->
-                    this.binaryOperation.apply(arg1, arg2);
-    }
-
-    /**
-     * Application of this monoid's operation, •<br>
-     * This is an <i>endofunction</i>/<i>endomorphism</i>.
-     *
-     * <p>
-     * <i>
-     * NB! Partial method:<br>
-     * The parameter values as well as the result must be actual elements of this magma.
-     * </i><br>
-     * Violations of this rule will result in a <i>bottom</i> value&mdash;here <code>null</code> or runtime exceptions.
-     * </p>
-     *
-     * @param element1 a monoid element
-     * @param element2 a monoid element
-     * @return a resulting magma element, or a bottom value if one of the arguments or the result is not an element of this monoid
-     * @throws IllegalArgumentException if one or both of the arguments are not elements of this monoid
-     */
-    public T append(T element1, T element2) {
-        Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");
-        Arguments.requireNotNull(element2, "'element2' argument cannot be 'null'");
-
-        // No, makes 'append' not applicable when used for e.g. folding
-        //if (element1.equals(element2)) {
-        //    // Monoid exception for folding with the identity element as the initial value
-        //    if (!element1.equals(this.identityElement)) {
-        //        throw new IllegalArgumentException("Cannot append two equal element values in a monoid");
-        //    }
-        //}
-
-        return this.binaryOperation.apply(element1, element2);
-    }
-
-    /**
-     * <p>
      * To <i>fold</i> a value (e.g. a monoid) means creating a new representation of it.
-     * </p>
      *
      * <p>
      * In abstract algebra, this is known as a <i>catamorphism</i>.
@@ -202,26 +145,27 @@ public class FreeMonoid<T> {
         if (this instanceof MonoidStructure<?>) {
             return (MonoidStructure<T>) this;
         }
-        if (enumeratedSet instanceof LinkedHashSet) {
+        if (enumeratedSet instanceof LinkedHashSet<?>) {
             return new MonoidStructure<>((LinkedHashSet<T>) enumeratedSet, this.binaryOperation, this.identityElement);
         }
-        if (enumeratedSet instanceof SortedSet) {
+        if (enumeratedSet instanceof SortedSet<?>) {
             return new MonoidStructure<>((SortedSet<T>) enumeratedSet, this.binaryOperation, this.identityElement);
         }
         throw new IllegalArgumentException("The given 'enumeratedSet' argument must be strictly enumerated");
     }
 
     /**
-     * @return a (deferred) {@link Reader} version of this monoid's identity element
+     * @return a (deferred) 'Reader' version of this monoid's identity element
      */
     public Reader<T> toReaderIdentity() {
-        return Reader.of(() -> this.identityElement);
+        return Reader.startingWith(this.identityElement);
     }
 
     /**
-     * @return a (deferred) {@link Promise} version of this monoid's identity element
+     * @return a (deferred, and not resolved) 'Promise' version of this monoid's identity element
      */
     public Promise<T> toPromiseIdentity() {
-        return Promise.of(() -> this.identityElement);
+        //return Promise.startingWith(this.identityElement);
+        return Promise.of(deferredIdentity());
     }
 }

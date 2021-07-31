@@ -1,13 +1,27 @@
 package land.plainfunctional.algebraicstructure;
 
-import java.util.LinkedHashSet;
-import java.util.SortedSet;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 
 import land.plainfunctional.util.Arguments;
 
 /**
- * {@inheritDoc}
+ * A <b>semigroup</b> is an <i>associative magma</i>.
+ *
+ * <p>
+ * <i>Formally:</i> To qualify as a semigroup, the set 𝕊 and the binary operation • must be associative:<br>
+ * &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;∀(𝓍,𝓎,𝓏) ∈ 𝕊 ⇒ (𝓍 • 𝓎) • 𝓏 = 𝓍 • (𝓎 • 𝓏)
+ * </p>
+ *
+ * <p>
+ * Associativity means that all (applications of the binary) operations may be applied in whatever order,
+ * as long as the order of the values do not change.
+ * This requirement is enforced by the {@link java.util.LinkedHashSet} constructor argument,
+ * which preserves the insertion order when it is iterated.
+ * For other ordering schemes, the requirement is enforced by the {@link java.util.SortedSet} constructor argument,
+ * enumerating the semigroup elements via a the {@link java.util.SortedSet}'s mandatory {@link java.util.Comparator} member instance,
+ * which may be set via one of the {@link java.util.SortedSet}'s constructors.
+ * </p>
  *
  * <p>...</p>
  *
@@ -29,59 +43,66 @@ import land.plainfunctional.util.Arguments;
  * <p>
  * <i>Disclaimer:</i><br>
  * Finding myself kind of on a limb when it comes to the theoretical concepts and terms regarding this algebraic <i>free</i> thingy...<br>
- * I think the use of it here is mostly viable... hope so.
+ * I think the use of it here is mostly correct... hope so.
  * </p>
  *
  * @param <T> The semigroup type, all values of this type belongs to the semigroup
  * @see <a href="https://en.wikipedia.org/wiki/Free_monoid">Free semigroup (Wikipedia)</a>
- * @deprecated 'Free' mandates no (bounded) set of elements, does is not?
  */
-@Deprecated // 'Free' mandates no (bounded) set of elements, does it not?
-public class FreeSemigroup<T> extends Semigroup<T> {
+public class FreeSemigroup<T> {
 
     /**
-     * @param linkedHashSet   set of elements which preserves its element insertion order when iterated
-     * @param binaryOperation associative and closed binary operation
-     */
-    public FreeSemigroup(
-        LinkedHashSet<T> linkedHashSet,
-        BinaryOperator<T> binaryOperation
-    ) {
-        super(linkedHashSet, binaryOperation);
-    }
-
-    /**
-     * @param sortedSet       set of elements which iteration order is defined by its 'Comparator' member
-     * @param binaryOperation associative and closed binary operation
-     */
-    public FreeSemigroup(
-        SortedSet<T> sortedSet,
-        BinaryOperator<T> binaryOperation
-    ) {
-        super(sortedSet, binaryOperation);
-    }
-
-    /**
-     * Application of this free semigroup's operation, an <i>endofunction</i> for <code>T</code>.
+     * This semigroup's binary operation.
      *
      * <p>
-     * <i>NB! The totality property of this free magma is enforced by the compiler's type system.</i>
+     * The totality/closure property which the binary operation also must inhibit,
+     * is enforced via the single-parametric {@link BinaryOperator} class,
+     * in addition to constraints defined in the <code>append</code> method.
+     * </p>
+     */
+    public final BinaryOperator<T> binaryOperation;
+
+    /**
+     * @param binaryOperation associative and closed binary operation
+     */
+    public FreeSemigroup(BinaryOperator<T> binaryOperation) {
+        Arguments.requireNotNull(binaryOperation, "A semigroup must have an identity element - a neutral element");
+        this.binaryOperation = binaryOperation;
+    }
+
+    /**
+     * @return a curried version of this semigroup's associative, closed, binary operation
+     */
+    public Function<T, Function<T, T>> curriedBinaryOperation() {
+        return
+            (arg1) ->
+                (arg2) ->
+                    this.binaryOperation.apply(arg1, arg2);
+    }
+
+    /**
+     * Application of this semigroup's binary operation, •<br>
+     * This is an <i>endofunction</i>/<i>endomorphism</i>.
+     *
+     * <p>
+     * <i>NB! The totality property of this free semigroup is enforced by the compiler's type system.</i>
      * </p>
      *
      * @param element1 a semigroup element
      * @param element2 a semigroup element
-     * @return a resulting semigroup element, or a bottom value if the result is not an element of this magma
-     * @throws IllegalArgumentException if the element values are equal
-     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
+     * @return a resulting semigroup element
      */
-    @Override
     public T append(T element1, T element2) {
-        Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");
-        Arguments.requireNotNull(element2, "'element2' argument cannot be 'null'");
+        Arguments.requireNotNull(element1, "'element1' argument cannot be null");
+        Arguments.requireNotNull(element2, "'element2' argument cannot be null");
 
-        if (element1.equals(element2)) {
-            throw new IllegalArgumentException("Cannot append two equal element values in a magma");
-        }
+        // No, makes 'append' not applicable when used for e.g. folding
+        //if (element1.equals(element2)) {
+        //    // Monoid exception for folding with the identity element as the initial value
+        //    if (!element1.equals(this.identityElement)) {
+        //        throw new IllegalArgumentException("Cannot append two equal element values in a semigroup");
+        //    }
+        //}
 
         return this.binaryOperation.apply(element1, element2);
     }

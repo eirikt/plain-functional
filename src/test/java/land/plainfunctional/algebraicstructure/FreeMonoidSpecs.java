@@ -1,6 +1,5 @@
-// TODO: ...
 package land.plainfunctional.algebraicstructure;
-/*
+
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.SortedSet;
@@ -13,8 +12,9 @@ import org.junit.jupiter.api.Test;
 import land.plainfunctional.testdomain.vanillaecommerce.Address;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptySortedSet;
-import static land.plainfunctional.algebraicstructure.FreeSemigroupSpecs.orderedByInsertTime;
+import static land.plainfunctional.algebraicstructure.SemigroupSpecs.orderedByInsertTime;
+import static land.plainfunctional.monad.TestData.INTEGERS_UNDER_ADDITION_MONOID;
+import static land.plainfunctional.monad.TestData.STRING_APPENDING_MONOID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -28,42 +28,36 @@ class FreeMonoidSpecs {
         //FreeMonoid<String> magma = new FreeMonoid<>();
     }
 
-    void unaryConstructor_shouldNotCompile() {
-        //FreeMonoid<String> magma = new FreeMonoid<>(null);
+    void unaryConstructor_shouldNotCompile_1() {
+        //FreeMonoid<String> magma = new FreeMonoid<>((BinaryOperator<String>) null);
     }
 
-    void binaryConstructor_shouldNotCompile() {
-        //FreeMonoid<String> magma = new FreeMonoid<>(null, null);
+    void unaryConstructor_shouldNotCompile_2() {
+        //FreeMonoid<String> magma = new FreeMonoid<>((String) null);
     }
 
     @Test
     void binaryConstructor_whenNullArgs_shouldThrowException() {
         assertThatThrownBy(() -> new FreeMonoid<>(
-            (SortedSet<?>) null,
-            null,
-            null))
-            .isInstanceOf(NullPointerException.class);
-
-        assertThatThrownBy(() -> new FreeMonoid<String>(
-            emptySortedSet(),
-            null,
-            null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A magma must have a closed binary operation");
+                null,
+                null
+            )
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessage("A semigroup must have an identity element - a neutral element");
 
         assertThatThrownBy(() -> new FreeMonoid<>(
-            emptySortedSet(),
-            (BinaryOperator<String>) (s, s2) -> null,
-            null))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A monoid must have an identity element - a neutral element");
+                (BinaryOperator<String>) (s, s2) -> null,
+                null
+            )
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessage("A monoid must have an identity element - a neutral element");
 
-        assertThatThrownBy(() -> new FreeMonoid<String>(
-            emptySortedSet(),
-            null,
-            ""))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A magma must have a closed binary operation");
+        assertThatThrownBy(() -> new FreeMonoid<>(
+                null,
+                ""
+            )
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessage("A semigroup must have an identity element - a neutral element");
     }
 
 
@@ -73,34 +67,22 @@ class FreeMonoidSpecs {
 
     @Test
     void whenNullArgs_shouldThrowException() {
-        FreeMonoid<String> emptyStringAppendingMonoid = new FreeMonoid<>(
-            emptySortedSet(),
-            (string1, string2) -> string1 + string2,
-            ""
-        );
-
-        assertThatThrownBy(() -> emptyStringAppendingMonoid.append(null, null))
+        assertThatThrownBy(() -> STRING_APPENDING_MONOID.append(null, null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be null");
 
-        assertThatThrownBy(() -> emptyStringAppendingMonoid.append("foo", null))
+        assertThatThrownBy(() -> STRING_APPENDING_MONOID.append("foo", null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element2' argument cannot be 'null'");
+            .hasMessage("'element2' argument cannot be null");
 
-        assertThatThrownBy(() -> emptyStringAppendingMonoid.append(null, "foo"))
+        assertThatThrownBy(() -> STRING_APPENDING_MONOID.append(null, "foo"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be null");
     }
 
     @Test
     void shouldAppend_1() {
-        FreeMonoid<String> stringAppendingMonoid = new FreeMonoid<>(
-            new TreeSet<>(asList("foo", "bar", "foobar")),
-            (string1, string2) -> string1 + string2,
-            ""
-        );
-
-        assertThat(stringAppendingMonoid.append("foo", "bar")).isEqualTo("foobar");
+        assertThat(STRING_APPENDING_MONOID.append("foo", "bar")).isEqualTo("foobar");
     }
 
     @Test
@@ -115,7 +97,6 @@ class FreeMonoidSpecs {
         chronologicallyEnumeratedSet.add(address3);
 
         FreeMonoid<Address> addressAppendingMonoid = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
             Address::append,
             Address.IDENTITY
         );
@@ -136,13 +117,7 @@ class FreeMonoidSpecs {
         chronologicallyEnumeratedSet.add("bar");
         chronologicallyEnumeratedSet.add("barfoo");
 
-        FreeMonoid<String> stringAppendingMonoid = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2,
-            ""
-        );
-
-        assertThatThrownBy(() -> stringAppendingMonoid.append("bar", "foo"))
+        assertThatThrownBy(() -> STRING_APPENDING_MONOID.append("bar", "foo"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Illegal associative relation between the given elements in the Monoid");
     }
@@ -158,29 +133,19 @@ class FreeMonoidSpecs {
         chronologicallyEnumeratedSet.add(address2);
         chronologicallyEnumeratedSet.add(address3);
 
-        FreeMonoid<Address> stringAppendingMonoid = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
+        FreeMonoid<Address> addressAppendingMonoid = new FreeMonoid<>(
             Address::append,
             Address.IDENTITY
         );
 
-        assertThatThrownBy(() -> stringAppendingMonoid.append(address3, address1))
+        assertThatThrownBy(() -> addressAppendingMonoid.append(address3, address1))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Illegal associative relation between the given elements in the FreeMonoid");
     }
 
     @Test
     void shouldAppend_3() {
-        SortedSet<Integer> chronologicallyEnumeratedSet = new TreeSet<>(orderedByInsertTime());
-        chronologicallyEnumeratedSet.addAll(asList(7, 6, 5, 4, 3, 2, 1));
-
-        FreeMonoid<Integer> numberAppendingMonoid = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
-            Integer::sum,
-            0
-        );
-
-        assertThat(numberAppendingMonoid.append(2, 5)).isEqualTo(7);
+        assertThat(INTEGERS_UNDER_ADDITION_MONOID.append(2, 5)).isEqualTo(7);
     }
 
     @Test
@@ -190,10 +155,7 @@ class FreeMonoidSpecs {
                 ? 12
                 : (hour1 + hour2) % 12;
 
-        SortedSet<Integer> set = new TreeSet<>(asList(1, 3, 5, 7, 9, 11, 2, 4, 6, 8, 10, 12));
-
         FreeMonoid<Integer> clockHourAppendingMonoid = new FreeMonoid<>(
-            set,
             clockHourAdd,
             0
         );
@@ -224,13 +186,14 @@ class FreeMonoidSpecs {
         chronologicallyEnumeratedSet.add(" ");
 
         FreeMonoid<String> helloWorldGeneratingMonoid = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2,
-            ""
+            STRING_APPENDING_MONOID.binaryOperation,
+            STRING_APPENDING_MONOID.identityElement
         );
 
         String identityValue = "";
-        String reducedString = helloWorldGeneratingMonoid.set
+        String reducedString = helloWorldGeneratingMonoid
+            .toMonoidStructure(chronologicallyEnumeratedSet)
+            .set
             .parallelStream()
             .reduce(
                 identityValue,
@@ -248,13 +211,14 @@ class FreeMonoidSpecs {
         chronologicallyEnumeratedSet.add("!");
 
         FreeMonoid<String> helloWorldGeneratingMonoid = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2,
-            ""
+            STRING_APPENDING_MONOID.binaryOperation,
+            STRING_APPENDING_MONOID.identityElement
         );
 
         String identityValue = "";
-        String reducedString = helloWorldGeneratingMonoid.set
+        String reducedString = helloWorldGeneratingMonoid
+            .toMonoidStructure(chronologicallyEnumeratedSet)
+            .set
             .parallelStream()
             .reduce(
                 identityValue,
@@ -270,44 +234,33 @@ class FreeMonoidSpecs {
 
     @Test
     void shouldFold_1() {
-        String identityValue = "";
-
         SortedSet<String> chronologicallyEnumeratedSet = new TreeSet<>(orderedByInsertTime());
         chronologicallyEnumeratedSet.addAll(asList("a", " ", "b"));
 
-        FreeMonoid<String> helloWorldGeneratingSemigroup = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2,
-            identityValue
+        FreeMonoid<String> helloWorldGeneratingMonoid = new FreeMonoid<>(
+            STRING_APPENDING_MONOID.binaryOperation,
+            STRING_APPENDING_MONOID.identityElement
         );
 
-        assertThat(helloWorldGeneratingSemigroup.fold()).isEqualTo("a b");
+        assertThat(helloWorldGeneratingMonoid.fold(chronologicallyEnumeratedSet)).isEqualTo("a b");
     }
 
     // TODO: Yields duplicated elements in set (a bug somewhere...)
     //@Test
     void shouldFold_2() {
-        String identityValue = "";
-
         SortedSet<String> chronologicallyEnumeratedSet = new TreeSet<>(orderedByInsertTime());
         chronologicallyEnumeratedSet.addAll(asList(
             "Hello", " ", "world", "!", "Hello", " ", "world", "!", "Hello", " ", "world", "!"
         ));
 
-        FreeMonoid<String> helloWorldGeneratingSemigroup = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2,
-            identityValue
-        );
+        FreeMonoid<String> helloWorldGeneratingMonoid = STRING_APPENDING_MONOID;
 
-        assertThat(helloWorldGeneratingSemigroup.fold()).isEqualTo("Hello world!");
+        assertThat(helloWorldGeneratingMonoid.fold(chronologicallyEnumeratedSet)).isEqualTo("Hello world!");
     }
 
     // TODO: Yields duplicated elements in set (a bug somewhere...)
-    //@Test
+    @Test
     void shouldFold_3() {
-        String identityValue = "";
-
         SortedSet<String> chronologicallyEnumeratedSet = new ConcurrentSkipListSet<>(orderedByInsertTime());
         chronologicallyEnumeratedSet.add("Hello");
         chronologicallyEnumeratedSet.add("Hello");
@@ -316,27 +269,15 @@ class FreeMonoidSpecs {
         chronologicallyEnumeratedSet.add("world");
         chronologicallyEnumeratedSet.add("world");
         chronologicallyEnumeratedSet.add("!");
-        chronologicallyEnumeratedSet.add("Hello");
-        chronologicallyEnumeratedSet.add("Hello");
-        chronologicallyEnumeratedSet.add(" ");
-        chronologicallyEnumeratedSet.add(" ");
-        chronologicallyEnumeratedSet.add("world");
-        chronologicallyEnumeratedSet.add("world");
         chronologicallyEnumeratedSet.add("!");
 
-        FreeMonoid<String> helloWorldGeneratingSemigroup = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2,
-            identityValue
-        );
+        FreeMonoid<String> helloWorldGeneratingMonoid = STRING_APPENDING_MONOID;
 
-        assertThat(helloWorldGeneratingSemigroup.fold()).isEqualTo("Hello world!");
+        assertThat(helloWorldGeneratingMonoid.fold(chronologicallyEnumeratedSet)).isEqualTo("Hello world!");
     }
 
     @Test
     void shouldFold_4() {
-        String identityValue = "";
-
         Set<String> chronologicallyEnumeratedSet = new LinkedHashSet<>();
         chronologicallyEnumeratedSet.add("Hello");
         chronologicallyEnumeratedSet.add("Hello");
@@ -356,19 +297,13 @@ class FreeMonoidSpecs {
         SortedSet<String> chronologicallyEnumeratedSortedSet = new TreeSet<>(orderedByInsertTime());
         chronologicallyEnumeratedSortedSet.addAll(chronologicallyEnumeratedSet);
 
-        FreeMonoid<String> helloWorldGeneratingSemigroup = new FreeMonoid<>(
-            chronologicallyEnumeratedSortedSet,
-            (string1, string2) -> string1 + string2,
-            identityValue
-        );
+        FreeMonoid<String> helloWorldGeneratingMonoid = STRING_APPENDING_MONOID;
 
-        assertThat(helloWorldGeneratingSemigroup.fold()).isEqualTo("Hello world!");
+        assertThat(helloWorldGeneratingMonoid.fold(chronologicallyEnumeratedSortedSet)).isEqualTo("Hello world!");
     }
 
     @Test
     void shouldFold_5() {
-        String identityValue = "";
-
         LinkedHashSet<String> chronologicallyEnumeratedSet = new LinkedHashSet<>();
         chronologicallyEnumeratedSet.add("Hello");
         chronologicallyEnumeratedSet.add("Hello");
@@ -385,13 +320,8 @@ class FreeMonoidSpecs {
         chronologicallyEnumeratedSet.add("world");
         chronologicallyEnumeratedSet.add("!");
 
-        FreeMonoid<String> helloWorldGeneratingSemigroup = new FreeMonoid<>(
-            chronologicallyEnumeratedSet,
-            (string1, string2) -> string1 + string2,
-            identityValue
-        );
+        FreeMonoid<String> helloWorldGeneratingMonoid = STRING_APPENDING_MONOID;
 
-        assertThat(helloWorldGeneratingSemigroup.fold()).isEqualTo("Hello world!");
+        assertThat(helloWorldGeneratingMonoid.fold(chronologicallyEnumeratedSet)).isEqualTo("Hello world!");
     }
 }
-*/
