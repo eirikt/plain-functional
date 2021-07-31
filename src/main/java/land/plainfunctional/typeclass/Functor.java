@@ -11,14 +11,11 @@ import java.util.function.Function;
  * <p>
  * In mathematics, a <i>functor</i> is a type of mapping between categories arising in category theory.
  * Functors can be thought of as <i>homomorphisms between categories</i>.
- * </p>
- *
- * <p>
  * In abstract algebra, a <i>homomorphism is a structure-preserving mapping between two algebraic structures of the same kind</i>.
  * </p>
  *
  * <p>
- * If ignoring the mathematical roots of this concept, this Java interface would maybe have been named <code>Mappable</code>.
+ * Another name for this Java interface could maybe have been <code>Mappable</code>.
  * </p>
  *
  * @param <T> The type of the value context, or just, the functor type

@@ -23,7 +23,7 @@ package land.plainfunctional.testdomain.vanillaecommerce;
  *</p>
  *
  * <p>
- * Typical examples of a value objects are numbers and addresses.
+ * Typical examples of a value objects are dates and addresses.
  * </p>
  */
 public interface Value {}

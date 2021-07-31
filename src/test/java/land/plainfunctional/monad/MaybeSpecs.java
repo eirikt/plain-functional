@@ -17,10 +17,10 @@ import land.plainfunctional.typeclass.Applicative;
 
 import static java.lang.Integer.sum;
 import static java.lang.String.format;
+import static land.plainfunctional.monad.Maybe.asMaybe;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.monad.Maybe.of;
-import static land.plainfunctional.monad.Maybe.asMaybe;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
 import static land.plainfunctional.testdomain.vanillaecommerce.Person.Gender.MALE;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -48,7 +48,7 @@ class MaybeSpecs {
         assertThatThrownBy(
             () -> just(null)
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a null/non-existing (\"bottom\") value");
     }
 
     @Test
@@ -89,7 +89,7 @@ class MaybeSpecs {
             () -> of("someString").map((ignored) -> (Integer) null)
 
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a null/non-existing (\"bottom\") value");
     }
 
     /**
@@ -383,7 +383,7 @@ class MaybeSpecs {
                     .apply(just(nullFn.apply(100)))
                     .apply(just(curriedPlus.apply(4)))
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a null/non-existing (\"bottom\") value");
 
         // And when doing 'map' of curried binary functions
         assertThatThrownBy(
@@ -394,7 +394,7 @@ class MaybeSpecs {
                     .apply(just(3).map(nullFn))
                     .apply(just(4).map(curriedPlus))
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a null/non-existing (\"bottom\") value");
     }
 
     @Test
@@ -1041,7 +1041,7 @@ class MaybeSpecs {
         assertThat(johnsBirthDate).isEqualTo(person.birthDate);
 
         // Alternatively, the more "uglier"
-        johnsBirthDate = maybePerson.getOrDefault(Person.IDENTITY).birthDate;
+        johnsBirthDate = maybePerson.getOrDefault(Person.identity()).birthDate;
         assertThat(johnsBirthDate).isEqualTo(person.birthDate);
 
         // Alternatively, the even more "uglier"

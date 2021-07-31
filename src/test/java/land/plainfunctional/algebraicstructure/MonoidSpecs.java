@@ -11,7 +11,7 @@ import land.plainfunctional.testdomain.vanillaecommerce.Address;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySortedSet;
 import static java.util.Collections.singletonList;
-import static land.plainfunctional.algebraicstructure.FreeSemigroupSpecs.orderedByInsertTime;
+import static land.plainfunctional.algebraicstructure.SemigroupSpecs.orderedByInsertTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -78,15 +78,15 @@ class MonoidSpecs {
 
         assertThatThrownBy(() -> emptyStringAppendingMonoid.append(null, null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be null");
 
         assertThatThrownBy(() -> emptyStringAppendingMonoid.append("foo", null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element2' argument cannot be 'null'");
+            .hasMessage("'element2' argument cannot be null");
 
         assertThatThrownBy(() -> emptyStringAppendingMonoid.append(null, "foo"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be null");
     }
 
     @Test

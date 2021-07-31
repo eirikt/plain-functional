@@ -2,9 +2,11 @@ package land.plainfunctional.monad;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -15,14 +17,20 @@ import java.util.function.Supplier;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
+import land.plainfunctional.algebraicstructure.FreeMonoid;
+import land.plainfunctional.algebraicstructure.MonoidStructure;
 import land.plainfunctional.typeclass.Applicative;
+import land.plainfunctional.typeclass.FunctorExtras;
 import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
 
 import static java.time.Duration.between;
 import static java.time.Instant.now;
+import static java.util.concurrent.CompletableFuture.allOf;
+import static java.util.concurrent.CompletableFuture.completedFuture;
 import static java.util.concurrent.CompletableFuture.supplyAsync;
 import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toCollection;
 import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.util.ReflectionUtils.createDefaultInstance;
 import static org.apache.commons.lang3.builder.ToStringStyle.SHORT_PREFIX_STYLE;
@@ -44,14 +52,19 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCauseMess
  * </p>
  *
  * <p>
- * Most aspects of {@link Promise} instances are <i>asynchronous</i> in nature&mdash;the
- * exception being if <i>folding</i> an unresolved {@link Promise} instance.
- * (Folding methods delegate to the <code>get()</code> methods, specified by the implemented {@link Future} interface.)
+ * Most aspects of {@link Promise} instances are <i>asynchronous</i> in nature.
+ * Unlike {@link Reader}s, {@link Promise}s may be asynchronously evaluated via the <code>evaluate</code> method.
+ * The only exception is when <i>folding</i> an unresolved {@link Promise} instance.
+ * (Folding methods delegate to the blocking <code>get()</code> methods, specified by the implemented {@link Future} interface.)
  * </p>
  *
  * @param <T> The type of the promised value
  */
-public class Promise<T> implements Monad<T>, Future<T> {
+public class Promise<T> implements Monad<T>, FunctorExtras<T>, Future<T> {
+
+    // Switch for verbose logging to System.out/System.err
+    private static final boolean DO_VERBOSE_LOGGING = true;
+
 
     ///////////////////////////////////////////////////////////////////////////
     // Factory methods
@@ -64,6 +77,8 @@ public class Promise<T> implements Monad<T>, Future<T> {
     public static <T> Promise<T> asPromise(Class<T> type) {
         return startingWith(createDefaultInstance(type));
     }
+
+    // TODO: Should this be renamed to e.g. 'resolved' - it is not semantically equivalent with 'Reader::startingWith'...
 
     /**
      * Alias for <code>of(resolvedValue)</code>.
@@ -92,38 +107,75 @@ public class Promise<T> implements Monad<T>, Future<T> {
         return new Promise<>(valueSupplier);
     }
 
+    /**
+     * Factory method.
+     *
+     * <p>
+     * Parallel fetching of values, and then folding them using the provided monoid.
+     * </p>
+     *
+     * @param supplierList The enumerated deferred values to be folded into this {@link Promise} functor
+     * @param monoid       The monoid to be used for folding the deferred values
+     * @param <T>          The type of the deferred values
+     * @return A {@link Promise} {@link Maybe} value
+     */
+    public static <T> Promise<Maybe<T>> of(
+        List<Supplier<? extends T>> supplierList,
+        FreeMonoid<T> monoid
+    ) {
+        List<Function<? super T, ? extends T>> functionList = new ArrayList<>(supplierList.size());
+        for (Supplier<? extends T> supplier : supplierList) {
+            functionList.add((ignored) -> supplier.get());
+        }
+        return monoid
+            .toPromiseIdentity()
+            .map(
+                Sequence.of(functionList),
+                monoid
+            );
+    }
+
+    /**
+     * Factory method.
+     *
+     * <p>
+     * Parallel fetching of values, and then folding them using the provided monoid.
+     * </p>
+     *
+     * @param supplierSequence The enumerated deferred values to be folded into this {@link Promise} functor
+     * @param monoid           The monoid to be used for folding the deferred values
+     * @param <T>              The type of the deferred values
+     * @return A {@link Promise} {@link Maybe} value
+     */
+    public static <T> Promise<Maybe<T>> of(
+        Sequence<Supplier<? extends T>> supplierSequence,
+        FreeMonoid<T> monoid
+    ) {
+        //throw new UnsupportedOperationException();
+
+        //List<Function<? super T, ? extends T>> functionList = new ArrayList<>(supplierList.size());
+        //for (Supplier<? extends T> supplier : supplierList) {
+        //    functionList.add((ignored) -> supplier.get());
+        //}
+        return monoid
+            .toPromiseIdentity()
+            .map(
+                //new Sequence<Function<? super T, ? extends T>> functionList,
+                supplierSequence.map(
+                    new Function<Supplier<? extends T>, Function<? super T, ? extends T>>() {
+                        @Override
+                        public Function<? super T, ? extends T> apply(Supplier<? extends T> supplier) {
+                            return (ignored) -> supplier.get();
+                        }
+                    }
+                ), monoid
+            );
+    }
+
 
     ///////////////////////////////////////////////////////////////////////////
     // Data constructors
     ///////////////////////////////////////////////////////////////////////////
-
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Constructors
-    ///////////////////////////////////////////////////////////////////////////
-
-    protected Promise(T resolvedValue) {
-        Arguments.requireNotNull(resolvedValue, "'Promise' cannot handle 'null' values");
-        resolve(resolvedValue);
-        System.out.printf("Promise(resolvedValue): Value (immediately) resolved: %s (thread \"%s\")%n", resolvedValue, Thread.currentThread().getName());
-    }
-
-    protected Promise(Supplier<T> nullaryFunction) {
-        Arguments.requireNotNull(nullaryFunction, "'Promise' cannot handle 'null' suppliers");
-        this.valueSupplier = nullaryFunction;
-    }
-
-    protected Promise(CompletableFuture<T> completableFuture) {
-        Arguments.requireNotNull(completableFuture, "'Promise' cannot handle 'null' futures");
-        this.valueFuture = completableFuture;
-        this.valueFuture.whenComplete(
-            (value, throwable) -> {
-                if (throwable != null) {
-                    throw new RuntimeException(throwable);
-                }
-                resolve(value);
-            });
-    }
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -139,7 +191,89 @@ public class Promise<T> implements Monad<T>, Future<T> {
     // TODO: Add cancel/interrupt mechanism
     //protected AtomicBoolean cancelled = new AtomicBoolean(false);
 
-    protected List<Consumer<? super T>> onResolvedEffectList = new ArrayList<>();
+    protected List<Consumer<? super T>> onResolvedEffectList;
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Constructors
+    ///////////////////////////////////////////////////////////////////////////
+
+    protected Promise(T resolvedValue) {
+        Arguments.requireNotNull(resolvedValue, "'Promise' cannot handle null values");
+        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
+        resolve(resolvedValue);
+        if (DO_VERBOSE_LOGGING) {
+            System.out.printf("Promise(resolvedValue): Value (immediately) resolved: %s (thread \"%s\")%n", resolvedValue, Thread.currentThread().getName());
+        }
+    }
+
+    /*
+    protected Promise(T resolvedValue, List<Consumer<? super T>> onResolvedEffectList) {
+        Arguments.requireNotNull(resolvedValue, "'Promise' cannot handle null values");
+        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
+        if (onResolvedEffectList != null && !onResolvedEffectList.isEmpty()) {
+            if (!this.onResolvedEffectList.addAll(onResolvedEffectList)) {
+                System.err.printf("Promise(resolvedValue): Appending effects FAILED! [%s]", this);
+            }
+        }
+        resolve(resolvedValue);
+        if (DO_VERBOSE_LOGGING) {
+            System.out.printf("Promise(resolvedValue): Value (immediately) resolved: %s (thread \"%s\")%n", resolvedValue, Thread.currentThread().getName());
+        }
+    }
+    */
+
+    protected Promise(Supplier<T> nullaryFunction) {
+        Arguments.requireNotNull(nullaryFunction, "'Promise' cannot handle null functions");
+        this.valueSupplier = nullaryFunction;
+        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
+    }
+
+    /*
+    protected Promise(Supplier<T> nullaryFunction, List<Consumer<? super T>> onResolvedEffectList) {
+        Arguments.requireNotNull(nullaryFunction, "'Promise' cannot handle null suppliers");
+        this.valueSupplier = nullaryFunction;
+        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
+        if (onResolvedEffectList != null && !onResolvedEffectList.isEmpty()) {
+            if (!this.onResolvedEffectList.addAll(onResolvedEffectList)) {
+                System.err.printf("Promise(resolvedValue): Appending effects FAILED! [%s]", this);
+            }
+        }
+    }
+    */
+
+    protected Promise(CompletableFuture<T> completableFuture) {
+        Arguments.requireNotNull(completableFuture, "'Promise' cannot handle null futures");
+        this.valueFuture = completableFuture;
+        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
+        this.valueFuture.whenComplete(
+            (value, throwable) -> {
+                if (throwable != null) {
+                    throw new RuntimeException(throwable);
+                }
+                resolve(value);
+            });
+    }
+
+    /*
+    protected Promise(CompletableFuture<T> completableFuture, List<Consumer<? super T>> onResolvedEffectList) {
+        Arguments.requireNotNull(completableFuture, "'Promise' cannot handle null futures");
+        this.valueFuture = completableFuture;
+        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
+        this.valueFuture.whenComplete(
+            (value, throwable) -> {
+                if (throwable != null) {
+                    throw new RuntimeException(throwable);
+                }
+                resolve(value);
+            });
+        if (onResolvedEffectList != null && !onResolvedEffectList.isEmpty()) {
+            if (!this.onResolvedEffectList.addAll(onResolvedEffectList)) {
+                System.err.printf("Promise(resolvedValue): Appending effects FAILED! [%s]", this);
+            }
+        }
+    }
+    */
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -192,16 +326,19 @@ public class Promise<T> implements Monad<T>, Future<T> {
      * @param effect The (side) effect
      * @return this (unmodified) {@link Promise} instance
      */
+    // TODO: Consider promoting this (partial) function to a typeclass function (together with 'effect')...
     public Promise<T> tryEffect(Consumer<? super T> effect) {
         Arguments.requireNotNull(effect, "'effect' argument cannot be null");
 
         if (isCancelled()) {
             throw new CancellationException();
         }
-        if (isDone()) {
-            System.out.println("'Promise::tryEffect' (with resolved value): Invoking effect immediately!");
+        if (isResolved()) {
+            if (DO_VERBOSE_LOGGING) {
+                System.out.println("'Promise::tryEffect' (with resolved value): Invoking effect immediately!");
+            }
         } else {
-            System.err.println("'Promise::tryEffect' (with supplier/future value): NB! Invoking effect immediately with 'null' as argument!");
+            System.err.println("'Promise::tryEffect' (with supplier/future value): NB! Invoking effect immediately with null as argument!");
         }
         effect.accept(this.resolvedValue);
 
@@ -209,15 +346,22 @@ public class Promise<T> implements Monad<T>, Future<T> {
     }
 
     /**
+     * Alias for <code>effect</code>.
+     */
+    public Promise<T> onResolved(Consumer<? super T> effect) {
+        return effect(effect);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>...</p>
+     *
      * Subscribe for a (side) effect to be executed when this {@link Promise} is resolved.
      * <i>This effect (callback function) will only be executed once.</i>
      *
-     * <p>
-     * Another name for this method could have been <code>onResolved</code>.
-     * </p>
-     *
      * @param effect The (side) effect
-     * @return this (unmodified) {@link Promise} instance
+     * @return this (unmodified) same {@link Promise} instance
      */
     public Promise<T> effect(Consumer<? super T> effect) {
         Arguments.requireNotNull(effect, "'effect' argument cannot be null");
@@ -225,15 +369,17 @@ public class Promise<T> implements Monad<T>, Future<T> {
         if (isCancelled()) {
             throw new CancellationException();
         }
-        if (isDone()) {
-            System.out.println("'Promise::effect' (with resolved value): Invoking effect immediately!");
+        if (isResolved()) {
+            if (DO_VERBOSE_LOGGING) {
+                System.out.println("'Promise::effect' (with resolved value): Invoking effect immediately!");
+            }
             effect.accept(this.resolvedValue);
 
         } else {
-            synchronized (this) {
+            if (DO_VERBOSE_LOGGING) {
                 System.out.println("'Promise::effect' (with supplier/future): Effect added/subscribed");
-                this.onResolvedEffectList.add(effect);
             }
+            this.onResolvedEffectList.add(effect);
         }
 
         return this;
@@ -245,10 +391,11 @@ public class Promise<T> implements Monad<T>, Future<T> {
      *
      * @param resolvedValue The resolved value for this {@link Promise}
      */
-    private synchronized void resolve(T resolvedValue) {
+    private void resolve(T resolvedValue) {
         this.resolvedValue = resolvedValue;
-        //this.done.set(true);
-        System.out.printf("'Promise::resolve' (with future), value resolved: '%s' (thread \"%s\")%n", this.resolvedValue, Thread.currentThread().getName());
+        if (DO_VERBOSE_LOGGING) {
+            System.out.printf("'Promise::resolve' (with future), value resolved: '%s' (thread \"%s\")%n", this.resolvedValue, Thread.currentThread().getName());
+        }
         for (Consumer<? super T> subscribedEffect : this.onResolvedEffectList) {
             subscribedEffect.accept(this.resolvedValue);
             if (!this.onResolvedEffectList.remove(subscribedEffect)) {
@@ -262,7 +409,7 @@ public class Promise<T> implements Monad<T>, Future<T> {
     // Future
     ///////////////////////////////////////////////////////////////////////////
 
-    // Here: Implemented as an alias of 'isResolved</code>'
+    // Here: Implemented as an alias for 'isResolved</code>'
     @Override
     public boolean isDone() {
         return isResolved();
@@ -271,7 +418,6 @@ public class Promise<T> implements Monad<T>, Future<T> {
     @Override
     public boolean isCancelled() {
         // TODO: Add cancel/interrupt mechanism
-        //throw new UnsupportedOperationException("Not yet implemented");
         return false;
     }
 
@@ -284,6 +430,7 @@ public class Promise<T> implements Monad<T>, Future<T> {
     @Deprecated
     public T get() throws InterruptedException, ExecutionException {
         try {
+            // NB! Blocks current thread!
             return get(0, null);
 
         } catch (TimeoutException exception) {
@@ -312,15 +459,24 @@ public class Promise<T> implements Monad<T>, Future<T> {
         }
 
         if (hasValueSupplier()) {
-            // NB! Blocks current thread!
             Instant start = now();
-            System.out.println("'Promise::get' (with supplier): NB! Blocking current thread!");
-            resolve(this.valueSupplier.get());
-            long blockingTimeInMillis = between(start, now()).toMillis();
-            if (blockingTimeInMillis > 10L) {
-                System.err.printf("'Promise::get' (with supplier): NB! Blocked current thread for %d ms%n", blockingTimeInMillis);
+            if (DO_VERBOSE_LOGGING) {
+                System.out.println("'Promise::get' (with supplier): NB! Blocking current thread!");
             }
-            System.out.printf("'Promise::get' (with supplier), value resolved: '%s' (thread \"%s\")%n", this.resolvedValue, Thread.currentThread().getName());
+            // NB! Blocks current thread!
+            resolve(this.valueSupplier.get());
+            if (DO_VERBOSE_LOGGING) {
+                long blockingTimeInMillis = between(start, now()).toMillis();
+                if (blockingTimeInMillis > 10L) {
+                    System.err.printf("'Promise::get' (with supplier): NB! Blocked current thread for %d ms%n", blockingTimeInMillis);
+                }
+                System.out.printf("'Promise::get' (with supplier), value resolved: '%s' (thread \"%s\")%n", this.resolvedValue, Thread.currentThread().getName());
+            }
+
+            // Allow null return values; Mostly handled by functions calling this one
+            //if (this.resolvedValue == null) {
+            //    throw new NullPointerException();
+            //}
 
             return this.resolvedValue;
         }
@@ -328,13 +484,20 @@ public class Promise<T> implements Monad<T>, Future<T> {
         if (hasValueFuture()) {
             try {
                 Instant start = now();
-                System.out.println("Promise::get() (with future): NB! Blocking current thread!");
-                //T localResolvedValue = this.valueFuture.get();
-                resolve(this.valueFuture.get());
-                long blockingTimeInMillis = between(start, now()).toMillis();
-                if (blockingTimeInMillis > 10L) {
-                    System.err.printf("Promise::get() (future): NB! Blocked current thread for %d ms%n", blockingTimeInMillis);
+                if (DO_VERBOSE_LOGGING) {
+                    System.out.println("Promise::get() (with future): NB! Blocking current thread!");
                 }
+                resolve(this.valueFuture.get());
+                if (DO_VERBOSE_LOGGING) {
+                    long blockingTimeInMillis = between(start, now()).toMillis();
+                    if (blockingTimeInMillis > 10L) {
+                        System.err.printf("Promise::get() (future): NB! Blocked current thread for %d ms%n", blockingTimeInMillis);
+                    }
+                }
+                if (this.resolvedValue == null) {
+                    throw new NullPointerException();
+                }
+
                 return this.resolvedValue;
 
             } catch (Exception exception) {
@@ -393,6 +556,7 @@ public class Promise<T> implements Monad<T>, Future<T> {
      * @return the new/other functor
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
      */
+    @Override
     public <V> Promise<V> map(
         Function<? super T, ? extends V> function,
         T defaultValue
@@ -402,16 +566,54 @@ public class Promise<T> implements Monad<T>, Future<T> {
         if (isCancelled()) {
             throw new CancellationException();
         }
+
         if (isResolved()) {
+            for (Consumer<? super T> effect : this.onResolvedEffectList) {
+                effect.accept(this.resolvedValue);
+            }
             return new Promise<>(
                 () -> function.apply(this.resolvedValue)
             );
         }
+
         if (hasValueSupplier()) {
+            // Effect list must be mapped as well
+            //List<Consumer<? super V>> mappedOnResolvedEffectList = new CopyOnWriteArrayList<>();
+            /*
+            for (Consumer<? super T> effect : this.onResolvedEffectList) {
+                mappedOnResolvedEffectList.add(
+                    new Consumer<V>() {
+                        @Override
+                        public void accept(V v) {
+                            //effect.accept(resolvedValue);
+                            effect.accept((T) v);
+                        }
+                    }
+                );
+            }
+            */
             return new Promise<>(
                 () -> {
                     try {
-                        return function.apply(this.valueSupplier.get());
+                        T resolvedValue = this.valueSupplier.get();
+                        //V mappedValue = function.apply(unMappedValue);
+
+                        for (Consumer<? super T> effect : this.onResolvedEffectList) {
+                            /*
+                            mappedOnResolvedEffectList.add(
+                                new Consumer<V>() {
+                                    @Override
+                                    public void accept(V v) {
+                                        //effect.accept(resolvedValue);
+                                        //effect.accept((T) v);
+                                        effect.accept(mappedValue);
+                                    }
+                                }
+                            );
+                            */
+                            effect.accept(resolvedValue);
+                        }
+                        return function.apply(resolvedValue);
 
                     } catch (Exception exception) {
                         if (defaultValue != null) {
@@ -422,20 +624,28 @@ public class Promise<T> implements Monad<T>, Future<T> {
                             return function.apply(defaultValue);
                         }
                         System.err.printf(
-                            "'Promise::map' (with supplier) FAILED, reason: %s%n",
+                            "'Promise::map' (with supplier) FAILED, reason: %s (No default value available!)%n",
                             getRootCauseMessage(exception)
                         );
                         throw new RuntimeException(exception);
                     }
-                });
+                }//,
+                //(List<Consumer<? super V>>) this.onResolvedEffectList
+                //mappedOnResolvedEffectList
+            );
         }
+
         if (hasValueFuture()) {
             try {
                 System.err.println("'Promise::map' (with future, default timeout): NB! Blocking current thread!");
-                T localResolvedValue = this.valueFuture.get();
-                V mappedValue = function.apply(localResolvedValue);
+                T resolvedValue = this.valueFuture.get();
+                for (Consumer<? super T> effect : this.onResolvedEffectList) {
+                    effect.accept(resolvedValue);
+                }
 
-                return new Promise<>(mappedValue);
+                return new Promise<>(
+                    function.apply(resolvedValue)
+                );
 
             } catch (Exception exception) {
                 System.err.printf(
@@ -449,23 +659,13 @@ public class Promise<T> implements Monad<T>, Future<T> {
         throw new IllegalStateException("'Promise' must either have a resolved value, a value supplier (\"nullary\" function), or a 'Future'-based value");
     }
 
-    /* TODO: Consider:
+    @Override
     public <V> Promise<Maybe<V>> map(
-        Function<? super T, ? extends V> function,
-        T defaultValue
-    ) {
-        throw new UnsupportedOperationException("Not yet implemented");
-    }
-    */
-
-    /* TODO: Consider:
-    public <V> Promise<Maybe<V>> map(
-        List<Function<? super T, ? extends V>> functorList,
+        Sequence<Function<? super T, ? extends V>> functionList,
         FreeMonoid<V> monoid
     ) {
-        return new Promise<>(() -> mapFold(functorList, monoid));
+        return new Promise<>(() -> mapFold(functionList, monoid));
     }
-    */
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -557,7 +757,9 @@ public class Promise<T> implements Monad<T>, Future<T> {
             return new Promise<>(
                 () -> {
                     Instant start = now();
-                    System.out.println("Promise::join() (with supplier): NB! Blocking current thread!");
+                    if (DO_VERBOSE_LOGGING) {
+                        System.out.println("'Promise::join' (with supplier): NB! Blocking current thread!");
+                    }
 
                     T value = this.valueSupplier.get();
 
@@ -570,9 +772,11 @@ public class Promise<T> implements Monad<T>, Future<T> {
                             value = promise.resolvedValue;
                         }
                     }
-                    long blockingTimeInMillis = between(start, now()).toMillis();
-                    if (blockingTimeInMillis > 10L) {
-                        System.err.printf("Promise::join() (with supplier): NB! Blocked current thread for %d ms%n", blockingTimeInMillis);
+                    if (DO_VERBOSE_LOGGING) {
+                        long blockingTimeInMillis = between(start, now()).toMillis();
+                        if (blockingTimeInMillis > 10L) {
+                            System.err.printf("'Promise::join' (with supplier): NB! Blocked current thread for %d ms%n", blockingTimeInMillis);
+                        }
                     }
                     return value;
                 }
@@ -581,11 +785,15 @@ public class Promise<T> implements Monad<T>, Future<T> {
         if (hasValueFuture()) {
             try {
                 Instant start = now();
-                System.out.println("Promise::join (with future): NB! Blocking current thread!");
+                if (DO_VERBOSE_LOGGING) {
+                    System.out.println("'Promise::join' (with future): NB! Blocking current thread!");
+                }
                 T resolvedValue = this.valueFuture.get();
-                long blockingTimeInMillis = between(start, now()).toMillis();
-                if (blockingTimeInMillis > 10L) {
-                    System.err.printf("Promise::join (with future): NB! Blocked current thread for %d ms%n", blockingTimeInMillis);
+                if (DO_VERBOSE_LOGGING) {
+                    long blockingTimeInMillis = between(start, now()).toMillis();
+                    if (blockingTimeInMillis > 10L) {
+                        System.err.printf("'Promise::join' (with future): NB! Blocked current thread for %d ms%n", blockingTimeInMillis);
+                    }
                 }
                 return new Promise<>(resolvedValue);
 
@@ -624,14 +832,13 @@ public class Promise<T> implements Monad<T>, Future<T> {
      * @return the evaluated (deferred) value in a {@link Maybe} context
      */
     public Maybe<T> toMaybe() {
-        // NB! Blocks current thread!
         Either<String, T> either = toEither();
 
         // Handles exceptions
         if (either.isLeft()) {
             return nothing();
         }
-        // Handles 'null'
+        // Handles nulls
         return Maybe.of(either.tryGet());
     }
 
@@ -644,7 +851,6 @@ public class Promise<T> implements Monad<T>, Future<T> {
      * with a failure message as the 'Either.Left' if the value is for some reason is not available
      */
     public Either<String, T> toEither() {
-        // NB! Blocks current thread!
         return fold(
             (exception) -> {
                 System.err.printf(
@@ -660,29 +866,13 @@ public class Promise<T> implements Monad<T>, Future<T> {
 
     ///////////////////////////////////////////////////////////////////////////
     // Asynchronous evaluation
-    // "Async/await", well...
     ///////////////////////////////////////////////////////////////////////////
-
-    /*
-     * Alias of <code>evaluate</code>.
-     /
-    public Promise<T> async() {
-        return evaluate();
-    }
-
-    /
-     * Alias of <code>tryGet</code>.
-     /
-    public T await() {
-        // NB! Blocks current thread!
-        return tryGet();
-    }
-    */
 
     /**
      * Asynchronously evaluate/execute this 'Promise'.
      * If not already evaluated (and resolved), or an async execution is already started,
      * then a {@link CompletableFuture} of this promise's {@link Supplier} value will be created and started.
+     * NB! This {@link CompletableFuture} will use the common Fork/Join thread pool.
      *
      * @return A new {@link Promise} coupled to an executing {@link CompletableFuture}
      */
@@ -691,15 +881,19 @@ public class Promise<T> implements Monad<T>, Future<T> {
             throw new CancellationException();
         }
         if (isResolved()) {
-            System.out.println("( isResolved() (already) )");
+            if (DO_VERBOSE_LOGGING) {
+                System.out.println("( isResolved() (already) )");
+            }
             return this;
         }
         if (hasValueFuture()) {
-            System.out.println("( hasFuture() (already) )");
+            if (DO_VERBOSE_LOGGING) {
+                System.out.println("( hasFuture() (already) )");
+            }
             return this;
         }
 
-        // Async execution
+        // Starts async/non-blocking execution
         Promise<T> futureBasedPromise = new Promise<>(
             supplyAsync(
                 this.valueSupplier
@@ -725,7 +919,6 @@ public class Promise<T> implements Monad<T>, Future<T> {
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
      */
     public T tryGet() {
-        // NB! Blocks current thread!
         return fold(
             (exception) -> { throw new RuntimeException(exception); },
             identity()
@@ -734,7 +927,7 @@ public class Promise<T> implements Monad<T>, Future<T> {
 
     /**
      * To <i>fold</i> a value means creating a new representation of it.
-     * For {@link Reader} instances this will force execution/evaluation.
+     * For {@link Promise} instances this will force execution/evaluation.
      *
      * <p>
      * In abstract algebra, this is known as a <i>catamorphism</i>.
@@ -784,9 +977,12 @@ public class Promise<T> implements Monad<T>, Future<T> {
         if (isCancelled()) {
             throw new CancellationException();
         }
+
         try {
-            // NB! Blocks current thread!
-            return onRead.apply(get());
+            return onRead.apply(
+                // NB! Blocks current thread!
+                get()
+            );
 
         } catch (Exception exception) {
             System.err.printf(
@@ -797,57 +993,47 @@ public class Promise<T> implements Monad<T>, Future<T> {
         }
     }
 
-    /* TODO: Consider:
-    public <V> V tryMapFold(
-        List<Function<? super T, ? extends V>> functorList,
-        FreeMonoid<V> monoid
-    ) throws Exception {
-        if (isCancelled()) {
-            throw new CancellationException();
-        }
-        // NB! Blocks current thread!
-        return mapFold(tryGet(), functorList, monoid);
-    }
-    */
-
-    /* TODO: Consider:
+    @Override
     public <V> Maybe<V> mapFold(
-        List<Function<? super T, ? extends V>> functorList,
+        Sequence<Function<? super T, ? extends V>> functionList,
         FreeMonoid<V> monoid
     ) {
-        // NB! Blocks current thread!
-        Maybe<T> promisedValue = toMaybe();
-        if (promisedValue.isNothing()) {
+        Maybe<T> maybePromisedValue = toMaybe();
+        if (maybePromisedValue.isNothing()) {
             return nothing();
         }
+
         try {
-            return Maybe.of(mapFold(promisedValue.tryGet(), functorList, monoid));
+            // Partiality: Handles null values
+            return Maybe.of(tryMapFold(maybePromisedValue.tryGet(), functionList, monoid));
 
         } catch (Exception exception) {
             System.err.printf(
                 "'Promise::mapFold' FAILED, reason: %s. Returning 'Maybe.Nothing'.%n",
                 getRootCauseMessage(exception)
             );
+            // Partiality: Handles exceptions
             return nothing();
         }
     }
-    */
 
-    /* TODO: Consider:
-    static <T, V> V mapFold(
+    static <T, V> V tryMapFold(
         T initialValue,
-        List<Function<? super T, ? extends V>> functorList,
+        Sequence<Function<? super T, ? extends V>> functionList,
         FreeMonoid<V> monoid
-    ) throws ExecutionException, InterruptedException {
+    ) throws Exception {
+        Arguments.requireNotNull(initialValue, "'initialValue' argument cannot be null");
+        Arguments.requireNotNull(functionList, "'functionList' argument cannot be null");
+        Arguments.requireNotNull(monoid, "'monoid' argument cannot be null");
 
         CompletableFuture<T> initialFuture = completedFuture(initialValue);
 
         List<CompletableFuture<V>> asyncFunctorList = new ArrayList<>();
-        for (Function<? super T, ? extends V> mapFunction : functorList) {
+        for (Function<? super T, ? extends V> function : functionList.toJavaList()) {
             asyncFunctorList.add(
                 initialFuture
                     .thenApplyAsync(
-                        mapFunction
+                        function
                         //, runnable -> new Thread(runnable).start()     // New thread per future evaluation (thread will be properly disposed of)
                         //, mySharedAndManagedAndOptimizedThreadExecutor // Either an instance member or method-injected 'ThreadExecutor'
                     )
@@ -866,7 +1052,6 @@ public class Promise<T> implements Monad<T>, Future<T> {
             , monoid.identityElement
         ).fold();
     }
-    */
 
 
     ///////////////////////////////////////////////////////////////////////////

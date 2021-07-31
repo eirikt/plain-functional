@@ -18,7 +18,12 @@ I will strive to follow concepts and terminology from [Haskell](https://www.hask
 Haskell has a strong mathematical foundation, hence the name "_Plain functional_".
 This, again, is for the ultimate goal of precision and preciseness when declaring logic.
 _Plain functional_ will prioritize ease-of-use and readability first&mdash;and performance later.
-Who knows, maybe this library develops into something useful in the future.
+
+That being said; There are some motivations for taking this library further.
+E.g. is Vavr [rejecting](https://github.com/vavr-io/vavr/issues/20) adding monads like the Writer monad and the State monad.
+Those are extremely useful monads that really may bring a semi-functional Java codebase closer to a pure functional implementation.
+
+So, who knows, maybe this library develops into something useful in the future.
 
 ---
 

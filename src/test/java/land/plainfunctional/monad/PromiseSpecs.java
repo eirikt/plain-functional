@@ -3,10 +3,7 @@ package land.plainfunctional.monad;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
-import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -14,35 +11,30 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 import land.plainfunctional.algebraicstructure.FreeMonoid;
-import land.plainfunctional.algebraicstructure.MonoidStructure;
 import land.plainfunctional.testdomain.TestFunctions;
 import land.plainfunctional.testdomain.vanillaecommerce.Customer;
 import land.plainfunctional.testdomain.vanillaecommerce.Person;
 import land.plainfunctional.testdomain.vanillaecommerce.VipCustomer;
 
-import static java.lang.Integer.sum;
 import static java.time.Duration.between;
 import static java.time.Instant.now;
-import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.monad.Promise.asPromise;
-import static land.plainfunctional.monad.ReaderSpecs.INTEGERS_UNDER_ADDITION_MONOID;
-import static land.plainfunctional.monad.ReaderSpecs.delayedHelloWorldSupplier;
-import static land.plainfunctional.monad.ReaderSpecs.delayedMaybeRandomIntegerSupplier;
-import static land.plainfunctional.monad.ReaderSpecs.delayedRandomIntegerOrBottomSupplier;
-import static land.plainfunctional.monad.ReaderSpecs.getDelayedInteger;
-import static land.plainfunctional.monad.ReaderSpecs.getDelayedString;
-import static land.plainfunctional.monad.ReaderSpecs.helloWorldSupplier;
-import static land.plainfunctional.monad.ReaderSpecs.nullSupplier;
-import static land.plainfunctional.monad.ReaderSpecs.oneSupplier;
-import static land.plainfunctional.monad.ReaderSpecs.randomIntegerSupplier;
-import static land.plainfunctional.monad.ReaderSpecs.runtimeExceptionSupplier;
-import static land.plainfunctional.monad.ReaderSpecs.throwRuntimeExceptionSupplier;
+import static land.plainfunctional.monad.Sequence.asSequence;
+import static land.plainfunctional.monad.TestData.INTEGERS_UNDER_ADDITION_MONOID;
+import static land.plainfunctional.monad.TestData.delayedHelloWorldSupplier;
+import static land.plainfunctional.monad.TestData.delayedMaybeRandomIntegerSupplier;
+import static land.plainfunctional.monad.TestData.delayedRandomIntegerOrBottomSupplier;
+import static land.plainfunctional.monad.TestData.helloWorldSupplier;
+import static land.plainfunctional.monad.TestData.nullSupplier;
+import static land.plainfunctional.monad.TestData.oneSupplier;
+import static land.plainfunctional.monad.TestData.randomIntegerSupplier;
+import static land.plainfunctional.monad.TestData.runtimeExceptionSupplier;
+import static land.plainfunctional.monad.TestData.throwRuntimeExceptionSupplier;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
-import static land.plainfunctional.util.InstrumentationUtils.printExecutionStepInfo;
 import static land.plainfunctional.util.InstrumentationUtils.printThreadInfo;
 import static land.plainfunctional.util.InstrumentationUtils.sleep;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,32 +58,32 @@ class PromiseSpecs {
     void shouldNotBlockExecutingThread() throws ExecutionException, InterruptedException {
         Instant start = now();
 
-        Promise<String> helloWorldLengthIsEvenNumberReader = Promise
+        Promise<String> helloWorldLengthIsEvenNumberPromise = Promise
             .of(delayedHelloWorldSupplier); // 1000 ms delay
 
         assertThat(between(start, now()).toMillis()).isLessThan(50); // ms (< 50 ms is considered non-blocking...)
 
-        assertThat(helloWorldLengthIsEvenNumberReader.isCancelled()).isFalse();
-        assertThat(helloWorldLengthIsEvenNumberReader.isDone()).isFalse();
+        assertThat(helloWorldLengthIsEvenNumberPromise.isCancelled()).isFalse();
+        assertThat(helloWorldLengthIsEvenNumberPromise.isDone()).isFalse();
 
-        Promise<String> resolvedPromise = helloWorldLengthIsEvenNumberReader.evaluate();
+        Promise<String> resolvedPromise = helloWorldLengthIsEvenNumberPromise.evaluate();
 
         assertThat(between(start, now()).toMillis()).isLessThan(250); // ms
 
-        assertThat(helloWorldLengthIsEvenNumberReader).isNotEqualTo(resolvedPromise);
+        assertThat(helloWorldLengthIsEvenNumberPromise).isNotEqualTo(resolvedPromise);
 
-        assertThat(helloWorldLengthIsEvenNumberReader.isCancelled()).isFalse();
-        assertThat(helloWorldLengthIsEvenNumberReader.isDone()).isFalse();
+        assertThat(helloWorldLengthIsEvenNumberPromise.isCancelled()).isFalse();
+        assertThat(helloWorldLengthIsEvenNumberPromise.isDone()).isFalse();
         assertThat(resolvedPromise.isCancelled()).isFalse();
         assertThat(resolvedPromise.isDone()).isFalse();
 
         // Blocks!
         assertThat(resolvedPromise.get()).isSameAs("Hello World!");
 
-        assertThat(between(start, now()).toMillis()).isGreaterThan(1000); // ms
+        assertThat(between(start, now()).toMillis()).isGreaterThanOrEqualTo(1000); // ms
 
-        assertThat(helloWorldLengthIsEvenNumberReader.isCancelled()).isFalse();
-        assertThat(helloWorldLengthIsEvenNumberReader.isDone()).isFalse();
+        assertThat(helloWorldLengthIsEvenNumberPromise.isCancelled()).isFalse();
+        assertThat(helloWorldLengthIsEvenNumberPromise.isDone()).isFalse();
         assertThat(resolvedPromise.isCancelled()).isFalse();
         assertThat(resolvedPromise.isDone()).isTrue();
     }
@@ -121,7 +113,7 @@ class PromiseSpecs {
     void shouldProhibitNullAsConstructorArgs() {
         assertThatThrownBy(() -> Promise.of((Supplier<?>) null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'Promise' cannot handle 'null' suppliers");
+            .hasMessage("'Promise' cannot handle null functions");
     }
 
     @Test
@@ -341,7 +333,7 @@ class PromiseSpecs {
         printThreadInfo();
         sleep(4, SECONDS);
 
-        System.out.printf("#4: Fetch resolved value (%d milliseconds elapsed)%n", between(start, now()).toMillis());
+        System.out.printf("#4: Fetching resolved value (%d milliseconds elapsed)%n", between(start, now()).toMillis());
         printThreadInfo();
 
         // Blocking fetching of (monadic) value
@@ -862,7 +854,7 @@ class PromiseSpecs {
         // Sequence<Promise<Maybe<Integer>>>
         System.out.println();
         System.out.println("Folding 'Sequence<Promise<Maybe<Integer>>>' using 'Promise::toMaybe' (1b)");
-        sequenceOfMaybeIntegerPromises = Sequence.of(
+        sequenceOfMaybeIntegerPromises = asSequence(
             Promise.of(delayedMaybeRandomIntegerSupplier),
             Promise.of(delayedMaybeRandomIntegerSupplier),
             Promise.of(delayedMaybeRandomIntegerSupplier)
@@ -909,6 +901,7 @@ class PromiseSpecs {
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
 
 
+        /* Is 'Reader.foldLeft(FreeMonoid)' really needed/valuable?
         // Using Promise's built-in Maybe transformation 3 (+ a free monoid for folding)
         // Sequence<Lazy<Integer>>
         System.out.println();
@@ -925,8 +918,10 @@ class PromiseSpecs {
                 .foldLeft(INTEGERS_UNDER_ADDITION_MONOID);
         System.out.println(foldedSequenceOfIntegers);
         assertThat(foldedSequenceOfIntegers).isGreaterThanOrEqualTo(0);
+        */
 
 
+        /*
         // Sequence<Promise<Integer>>
         System.out.println();
         System.out.println("Using on-the-fly monoid structure for folding \"flaky\" 'Sequence<Promise<Integer>>'");
@@ -1007,6 +1002,7 @@ class PromiseSpecs {
             .tryGet();
         System.out.println(foldedValue);
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
+        */
     }
 
     // NB! Ad-hoc experimentations
@@ -1111,7 +1107,7 @@ class PromiseSpecs {
 
         int defaultValue = monoid.identityElement; // If map does not return a value
         Function<Integer, Function<Integer, Integer>> appendFunction = monoid.curriedBinaryOperation();
-        Promise<Integer> readerIdentity = monoid.toPromiseIdentity(); // Here just a deferred number zero wrapped in a 'Reader'
+        Promise<Integer> promiseIdentity = monoid.toPromiseIdentity(); // Here just a deferred number zero wrapped in a 'Reader'
 
         Promise<Integer> promise1 = Promise.of(slowAndFragileOperation1);
         Promise<Integer> promise2 = Promise.of(slowAndFragileOperation2);
@@ -1121,7 +1117,7 @@ class PromiseSpecs {
         Promise<Function<? super Integer, ? extends Integer>> partiallyAppliedAppendFunctionPromise2 = promise2.map(appendFunction, defaultValue);
         Promise<Function<? super Integer, ? extends Integer>> partiallyAppliedAppendFunctionPromise3 = promise3.map(appendFunction, defaultValue);
 
-        Promise<Integer> deferredComputation = readerIdentity
+        Promise<Integer> deferredComputation = promiseIdentity
             .apply(partiallyAppliedAppendFunctionPromise1)
             .apply(partiallyAppliedAppendFunctionPromise2)
             .apply(partiallyAppliedAppendFunctionPromise3);
@@ -1133,7 +1129,7 @@ class PromiseSpecs {
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
 
         System.out.println("Again, compact version...");
-        deferredComputation = readerIdentity
+        deferredComputation = promiseIdentity
             .apply(promise1.map(appendFunction, defaultValue))
             .apply(promise2.map(appendFunction, defaultValue))
             .apply(promise3.map(appendFunction, defaultValue));
@@ -1150,7 +1146,7 @@ class PromiseSpecs {
         FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
 
         System.out.println("Building deferred computational structure...");
-        Supplier<String> slowAndFragileOperation = ReaderSpecs::getRandomlyDelayedOrTimedOutRandomString;
+        Supplier<String> slowAndFragileOperation = TestData::getRandomlyDelayedStringOrTimeoutException;
 
         Promise<String> reader = Promise.of(slowAndFragileOperation);
 
@@ -1174,6 +1170,7 @@ class PromiseSpecs {
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
     }
 
+    /*
     // NB! Ad-hoc experimentations
     @Test
     void shouldHavePromisesAsSequenceElements() {
@@ -1233,63 +1230,10 @@ class PromiseSpecs {
         System.out.println(foldedValue);
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
     }
-
-    /*
-    // NB! Ad-hoc experimentations
-    @Test
-    void shouldDoAsyncMapFold() {
-        Instant start = Instant.now();
-
-        //AtomicInteger counter = new AtomicInteger(0);
-        final AtomicLong mark1 = new AtomicLong(0L);
-        final AtomicLong mark2 = new AtomicLong(0L);
-        final AtomicLong mark3 = new AtomicLong(0L);
-        final AtomicLong mark4 = new AtomicLong(0L);
-        final AtomicLong mark5 = new AtomicLong(0L);
-
-        FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
-
-        System.out.printf("%n%s%n",
-            Promise
-                .of(getDelayedString("Hello"))
-                .tryEffect((string) -> mark1.set(between(start, now()).toMillis()))
-                //.effect((string) -> printInfo(start, counter, string))
-                .mapN(
-                    asList(
-                        (string) -> getDelayedInteger(string.length()),
-                        (string) -> getDelayedInteger(string.length()),
-                        (string) -> getDelayedInteger(string.length())
-                    )
-                    , monoid
-                )
-                .tryEffect((string) -> mark2.set(between(start, now()).toMillis()))
-                //.effect((integer) -> printInfo(start, counter, integer))
-                .evaluate() // Start async evaluation
-                .tryEffect((string) -> mark3.set(between(start, now()).toMillis()))
-                //.effect((integer) -> printInfo(start, counter, integer))
-                .tryEffect((integer) -> sleep(800, MILLISECONDS))
-                .tryEffect((string) -> mark4.set(between(start, now()).toMillis()))
-                //.effect((integer) -> printInfo(start, counter, integer))
-                .tryEffect((integer) -> sleep(300, MILLISECONDS))
-                .tryEffect((string) -> mark5.set(between(start, now()).toMillis()))
-                //.effect((integer) -> printInfo(start, counter, integer))
-                // NB! Blocks current thread! (BUT PICKING UP ON THE ONGOING ASYNC EVALUATION! :-)
-                .toMaybe()
-                .tryGet()
-
-        ).printf("%n(took %d ms) (should take 1000 + 1000 + ~100 ms)%n", between(start, now()).toMillis());
-
-        assertThat(mark1.get()).isLessThan(1100); // ~100 ms in max computational startup "overhead"
-        assertThat(mark2.get()).isLessThan(1100);
-        assertThat(mark3.get()).isLessThan(1100);
-        assertThat(mark4.get()).isLessThan(1100 + 800);
-        assertThat(mark5.get()).isLessThan(1100 + 800 + 300);
-
-        assertThat(between(start, now()).toMillis()).isLessThan(1000 + 1000 + 400); // ~400 ms in max total computational "overhead"
-    }
     */
 
-    /* TODO: Consider:
+    /* TODO: ...
+    // NB! Ad-hoc experimentations
     @Test
     void shouldDoHandleAsyncEvaluationsAndEffects() {
         Instant start = Instant.now();
@@ -1305,8 +1249,6 @@ class PromiseSpecs {
         final AtomicLong onResolvedMark2 = new AtomicLong(0);
         final AtomicLong onResolvedMark3 = new AtomicLong(0);
 
-        FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
-
         System.out.printf("%n%s%n",
             Promise
                 .of(getDelayedString(1000, "Hello"))
@@ -1320,11 +1262,12 @@ class PromiseSpecs {
                 .effect((x) -> printExecutionStepInfo(start, counter, x))
                 .map(
                     asList(
-                        (string) -> getDelayedInteger(1000, string.length()),
-                        (string) -> getDelayedInteger(1000, string.length()),
                         (string) -> getDelayedInteger(1000, string.length())
+                        //,(string) -> getDelayedInteger(1000, string.length() + 1)
+                        //,(string) -> getDelayedInteger(1000, string.length() + 2)
+                        //,(string) -> getDelayedInteger(1000, string.length() + 3)
                     )
-                    , monoid
+                    , INTEGERS_UNDER_ADDITION_MONOID
                 )
                 .effect((x) -> {
                     System.out.println("CALLBACK2");
@@ -1368,7 +1311,7 @@ class PromiseSpecs {
         assertThat(mark4.get()).isGreaterThan(1000 + 800); // 0 being default, i.e. not set, i.e. callback not invoked
         assertThat(mark4.get()).isLessThan(1000 + 800 + 150); // ~150 ms in max computational startup "overhead"
         assertThat(mark5.get()).isGreaterThan(1000 + 800 + 300); // 0 being default, i.e. not set, i.e. callback not invoked
-        assertThat(mark5.get()).isLessThan(1000 + 800 + 300150); // ~150 ms in max computational startup "overhead"
+        assertThat(mark5.get()).isLessThan(1000 + 800 + 300 + 150); // ~150 ms in max computational startup "overhead"
 
         assertThat(onResolvedMark1.get()).isGreaterThan(1000); // 0 being default, i.e. not set, i.e. callback not invoked
         assertThat(onResolvedMark1.get()).isLessThan(1150);
@@ -1388,43 +1331,43 @@ class PromiseSpecs {
 
     @Test
     void toEither_whenMappingToBottomAsRuntimeException_shouldReturnLeft() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .map((integer) -> {
                 throw new RuntimeException();
             });
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("java.lang.RuntimeException");
+        assertThat(promise.toEither().isLeft()).isTrue();
+        assertThat(promise.toEither().tryGetLeft()).isSameAs("java.lang.RuntimeException");
     }
 
     @Test
     void toEither_whenMappingToBottomAsNull_shouldReturnLeft() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .map((integer) -> null);
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("Cannot create an 'Either.Right' from a 'null' value");
+        assertThat(promise.toEither().isLeft()).isTrue();
+        assertThat(promise.toEither().tryGetLeft()).isSameAs("Cannot create an 'Either.Right' from a 'null' value");
     }
 
     @Test
     void toEither_whenBindingToBottomAsRuntimeException_shouldReturnLeft() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Promise.of(
-                    () -> { throw new RuntimeException(); }
+                    () -> {throw new RuntimeException();}
                 )
             );
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isNull();
+        assertThat(promise.toEither().isLeft()).isTrue();
+        assertThat(promise.toEither().tryGetLeft()).isNull();
     }
 
     @Test
     void toEither_whenBindingToBottomAsNull_shouldReturnLeft() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Promise.of(
@@ -1432,17 +1375,17 @@ class PromiseSpecs {
                 )
             );
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("Cannot create an 'Either.Right' from a 'null' value");
+        assertThat(promise.toEither().isLeft()).isTrue();
+        assertThat(promise.toEither().tryGetLeft()).isSameAs("Cannot create an 'Either.Right' from a 'null' value");
     }
 
     @Test
     void toEither_whenMapping_shouldReturnRight() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .map((integer) -> integer + 1);
 
-        Either<String, Integer> maybeInteger = lazyHelloWorldLengthIsEvenNumber.toEither();
+        Either<String, Integer> maybeInteger = promise.toEither();
 
         assertThat(maybeInteger.isLeft()).isFalse();
         assertThat(maybeInteger.tryGet()).isGreaterThanOrEqualTo(2);
@@ -1455,40 +1398,40 @@ class PromiseSpecs {
 
     @Test
     void toMaybe_whenMappingToBottomAsRuntimeException_shouldReturnNothing() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .map((integer) -> {
                 throw new RuntimeException();
             });
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
+        assertThat(promise.toMaybe().isNothing()).isTrue();
     }
 
     @Test
     void toMaybe_whenMappingToBottomAsNull_shouldReturnNothing() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .map((integer) -> null);
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
+        assertThat(promise.toMaybe().isNothing()).isTrue();
     }
 
     @Test
     void toMaybe_whenBindingToBottomAsRuntimeException_shouldReturnNothing() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Promise.of(
-                    () -> { throw new RuntimeException(); }
+                    () -> {throw new RuntimeException();}
                 )
             );
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
+        assertThat(promise.toMaybe().isNothing()).isTrue();
     }
 
     @Test
     void toMaybe_whenBindingToBottomAsNull_shouldReturnNothing() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Promise.of(
@@ -1496,16 +1439,16 @@ class PromiseSpecs {
                 )
             );
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
+        assertThat(promise.toMaybe().isNothing()).isTrue();
     }
 
     @Test
     void toMaybe_whenMapping_shouldReturnJust() {
-        Promise<Integer> lazyHelloWorldLengthIsEvenNumber = Promise
+        Promise<Integer> promise = Promise
             .of(randomIntegerSupplier)
             .map((integer) -> integer + 1);
 
-        Maybe<Integer> maybeInteger = lazyHelloWorldLengthIsEvenNumber.toMaybe();
+        Maybe<Integer> maybeInteger = promise.toMaybe();
 
         assertThat(maybeInteger.isNothing()).isFalse();
         assertThat(maybeInteger.tryGet()).isGreaterThanOrEqualTo(2);

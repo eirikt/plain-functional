@@ -103,12 +103,16 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      * (As no {@link Maybe} yet exists, we are free to use either of the data constructors.)
      *
      * @param value The value to be put into this {@link Maybe} functor
-     * @return A 'Nothing' if the given value is 'null', otherwise 'Just'
+     * @return A 'Nothing' if the given value is undefined, otherwise 'Just'
      */
     public static <T> Maybe<T> of(T value) {
-        return value == null
+        //try {
+        return (value == null)
             ? nothing()
             : just(value);
+        //} catch (Exception exception){
+        //    return nothing();
+        //}
     }
 
 
@@ -136,9 +140,9 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      * <code>Just</code> data constructor.
      */
     public static <T> Maybe<T> just(T value) {
-        // TODO: Is this too strict? It deviates from Vavr's way of doing it, which allows 'null' for its 'Option.some' data constructor
+        // TODO: Is this too strict? It deviates from Vavr's way of doing it, which allows null for its 'Option.some' data constructor
         // => So far, it works as a fail-fast policy...
-        Arguments.requireNotNull(value, "Cannot create a 'Maybe.Just' from a 'null'/non-existing (/\"bottom\"/) value");
+        Arguments.requireNotNull(value, "Cannot create a 'Maybe.Just' from a null/non-existing (\"bottom\") value");
 
         return new Maybe<>(value);
     }
@@ -255,10 +259,8 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     }
 
     /**
-     * <p>
      * Retrieve this {@link Maybe} functor's value if this is a 'Just',
      * otherwise throw a {@link NullPointerException} (a bottom value).
-     * </p>
      *
      * <p>
      * This is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
@@ -276,10 +278,8 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     }
 
     /**
-     * <p>
      * Retrieve this {@link Maybe} functor's value if this is a 'Just',
      * otherwise return (the bottom value) <code>null</code>.
-     * </p>
      *
      * <p>
      * This is a very simple (and somewhat reckless) application of <code>fold</code>.
@@ -293,10 +293,8 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     }
 
     /**
-     * <p>
      * Retrieve this {@link Maybe} functor's value if this is a 'Just',
      * otherwise the given default value will be returned.
-     * </p>
      *
      * <p>
      * This is a simple application of <code>fold</code>.
@@ -314,9 +312,7 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     }
 
     /**
-     * <p>
      * To <i>fold</i> a value means creating a new representation of it.
-     * </p>
      *
      * <p>
      * In abstract algebra, this is known as a <i>catamorphism</i>.

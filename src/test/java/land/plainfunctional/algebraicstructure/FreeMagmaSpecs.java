@@ -54,15 +54,15 @@ class FreeMagmaSpecs {
 
         assertThatThrownBy(() -> emptyStringAppendingMagma.append(null, null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be null");
 
         assertThatThrownBy(() -> emptyStringAppendingMagma.append("foo", null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element2' argument cannot be 'null'");
+            .hasMessage("'element2' argument cannot be null");
 
         assertThatThrownBy(() -> emptyStringAppendingMagma.append(null, "foo"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be null");
     }
 
     @Test
@@ -74,15 +74,15 @@ class FreeMagmaSpecs {
 
         assertThatThrownBy(() -> emptyStringAppendingMagma.append(null, null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be null");
 
         assertThatThrownBy(() -> emptyStringAppendingMagma.append("foo", null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element2' argument cannot be 'null'");
+            .hasMessage("'element2' argument cannot be null");
 
         assertThatThrownBy(() -> emptyStringAppendingMagma.append(null, "foo"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'element1' argument cannot be 'null'");
+            .hasMessage("'element1' argument cannot be null");
     }
 
     @Test

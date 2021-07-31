@@ -1,14 +1,8 @@
 package land.plainfunctional.monad;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
-import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -16,30 +10,35 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 import land.plainfunctional.algebraicstructure.FreeMonoid;
-import land.plainfunctional.algebraicstructure.MonoidStructure;
 import land.plainfunctional.testdomain.TestFunctions;
 import land.plainfunctional.testdomain.vanillaecommerce.Customer;
 import land.plainfunctional.testdomain.vanillaecommerce.Person;
 import land.plainfunctional.testdomain.vanillaecommerce.VipCustomer;
-import land.plainfunctional.util.RandomUtils;
 
-import static java.lang.Integer.sum;
-import static java.lang.String.format;
 import static java.time.Duration.between;
 import static java.time.Instant.now;
-import static java.util.Arrays.asList;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.monad.Reader.asReader;
+import static land.plainfunctional.monad.TestData.INTEGERS_UNDER_ADDITION_MONOID;
+import static land.plainfunctional.monad.TestData.delayedHelloWorldSupplier;
+import static land.plainfunctional.monad.TestData.delayedJustOneSupplier;
+import static land.plainfunctional.monad.TestData.delayedMaybeRandomIntegerSupplier;
+import static land.plainfunctional.monad.TestData.delayedRandomIntegerOrBottomSupplier;
+import static land.plainfunctional.monad.TestData.helloWorldSupplier;
+import static land.plainfunctional.monad.TestData.nullSupplier;
+import static land.plainfunctional.monad.TestData.oneSupplier;
+import static land.plainfunctional.monad.TestData.randomIntegerSupplier;
+import static land.plainfunctional.monad.TestData.runtimeExceptionSupplier;
+import static land.plainfunctional.monad.TestData.throwRuntimeExceptionSupplier;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
-import static land.plainfunctional.util.InstrumentationUtils.sleep;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.util.Arrays.array;
 
 public class ReaderSpecs {
 
+    /*
     ///////////////////////////////////////////////////////////////////////////
     // Random test values
     ///////////////////////////////////////////////////////////////////////////
@@ -91,7 +90,7 @@ public class ReaderSpecs {
 
     static Supplier<Integer> randomIntegerSupplier = () -> random.pickRandomIntegerBetweenOneAnd(1000);
 
-    /*
+    /
     // Emulating a typical remote operation, which includes a time-out mechanism
     static Integer getRandomlyDelayedOrTimedOutRandomInteger() {
         Instant start = now();
@@ -114,7 +113,7 @@ public class ReaderSpecs {
         );
         throw new RuntimeException(new TimeoutException(format("This took way too long!%n")));
     }
-    */
+    /
     static Integer getRandomlyDelayedOrTimedOutRandomInteger() {
         return getRandomlyDelayedOrTimedOutInteger(
             // random.generateRandomString(2, 6)
@@ -161,14 +160,14 @@ public class ReaderSpecs {
         boolean successfulEvaluation = delayInMilliseconds < timeOutThresholdInMilliseconds;
         if (successfulEvaluation) {
             System.out.printf(
-                "'getDelayedOrTimedOutString' -> \"%s\", took %d ms%n",
+                "'getDelayedOrTimedOutInteger' -> %d, took %d ms%n",
                 integer,
                 between(start, now()).toMillis()
             );
             return integer;
         }
         System.out.printf(
-            "'getDelayedOrTimedOutString' -> %s, took %d ms%n",
+            "'getDelayedOrTimedOutInteger' -> %s, took %d ms%n",
             "timeout",
             between(start, now()).toMillis()
         );
@@ -185,7 +184,7 @@ public class ReaderSpecs {
                 return nothing();
             }
         };
-    private static Reader<Integer> delayedRandomIntegerOrBottomReader = Reader.of(delayedRandomIntegerOrBottomSupplier);
+    //private static Reader<Integer> delayedRandomIntegerOrBottomReader = Reader.of(delayedRandomIntegerOrBottomSupplier);
 
 
     static Supplier<String> helloWorldSupplier = () -> "Hello World!";
@@ -199,8 +198,8 @@ public class ReaderSpecs {
     //static Supplier<String> randomStringSupplier = () -> random.generateRandomString(2, 6);
 
     // Emulating a typical remote operation (which includes a time-out mechanism)
-    static String getRandomlyDelayedOrTimedOutRandomString() {
-        return getRandomlyDelayedOrTimedOutString(
+    static String getRandomlyDelayedStringOrTimeoutException() {
+        return getRandomlyDelayedStringOrTimeoutException(
             random.generateRandomString(2, 6)
         );
     }
@@ -211,8 +210,31 @@ public class ReaderSpecs {
     //private static Reader<String> delayedRandomStringOrBottomReader = Reader.of(delayedRandomStringOrBottomSupplier);
 
     // Emulating a typical remote operation (which includes a time-out mechanism)
-    static String getRandomlyDelayedOrTimedOutString(String string) {
-        return getDelayedOrTimedOutString(
+    // Partiality handles by 'Maybe'
+    public static Maybe<String> getMaybeRandomlyDelayedString(String string) {
+        try {
+            // Partiality/bottom values/undefined values: Handling of nulls
+            return Maybe.of(getRandomlyDelayedStringOrTimeoutException(string));
+
+        } catch (RuntimeException exception) {
+            // Partiality/bottom values/undefined values: Handling of runtime exceptions
+            return nothing();
+        }
+    }
+
+    // Emulating a typical remote operation (which includes a time-out mechanism)
+    public static Function<String, Supplier<String>> GET_RANDOMLY_DELAYED_STRING_OR_TIMEOUT_EXCEPTIONS =
+        (string) ->
+            () ->
+                getDelayedStringOrTimeoutException(
+                    2000, // => ~ 1/3 chance of timeout
+                    random.pickRandomInteger(200, 3000),
+                    string
+                );
+
+    // Emulating a typical remote operation (which includes a time-out mechanism)
+    public static String getRandomlyDelayedStringOrTimeoutException(String string) {
+        return getDelayedStringOrTimeoutException(
             2000, // => ~ 1/3 chance of timeout
             random.pickRandomInteger(200, 3000),
             string
@@ -227,7 +249,7 @@ public class ReaderSpecs {
     }
 
     public static String getDelayedString(Integer delayInMillisecond, String string) {
-        return getDelayedOrTimedOutString(
+        return getDelayedStringOrTimeoutException(
             null,
             delayInMillisecond,
             string
@@ -237,7 +259,7 @@ public class ReaderSpecs {
     //public static Function<String, String> delayedStringOrBottomFunction = ReaderSpecs::GET_RANDOMLY_DELAYED_OR_TIMED_OUT_STRING;
 
     // Emulating a typical remote operation (which includes a time-out mechanism)
-    static String getDelayedOrTimedOutString(Integer timeOutThresholdInMilliseconds, Integer delayInMilliseconds, String string) {
+    static String getDelayedStringOrTimeoutException(Integer timeOutThresholdInMilliseconds, Integer delayInMilliseconds, String string) {
         Instant start = now();
 
         if (timeOutThresholdInMilliseconds == null) {
@@ -285,6 +307,16 @@ public class ReaderSpecs {
             ""
         );
 
+    // See: https://en.wikipedia.org/wiki/Comma-separated_values
+    public static final Function<String, FreeMonoid<String>> CSV_MONOID_FUNCTION =
+        separator -> new FreeMonoid<>(
+            (string1, string2) -> isBlank(string2) ? string1 : string1 + separator + string2,
+            ""
+        );
+
+    // See: https://en.wikipedia.org/wiki/Comma-separated_values
+    public static final FreeMonoid<String> CSV_MONOID = CSV_MONOID_FUNCTION.apply(", ");
+*/
 
     ///////////////////////////////////////////////////////////////////////////
     // Reader properties
@@ -322,7 +354,7 @@ public class ReaderSpecs {
     void shouldBeDeferred_2() {
         Reader<?> reader = Reader.of(nullSupplier);
 
-        assertThat(reader.tryGet()).isNull();
+        assertThatThrownBy(reader::tryGet).isInstanceOf(RuntimeException.class);
     }
 
     @Test
@@ -886,7 +918,7 @@ public class ReaderSpecs {
             (lazyMaybeInt1, lazyMaybeInt2) ->
                 Reader.of(
                     () ->
-                        Maybe.just(
+                        just(
                             lazyMaybeInt1.tryGet().getOrDefault(0) +
                                 lazyMaybeInt2.tryGet().getOrDefault(0)
                         )
@@ -912,7 +944,7 @@ public class ReaderSpecs {
             (lazyMaybeInt1, lazyMaybeInt2) ->
                 Reader.of(
                     () ->
-                        Maybe.just(
+                        just(
                             lazyMaybeInt1.toMaybe().tryGet().getOrDefault(0) +
                                 lazyMaybeInt2.toMaybe().tryGet().getOrDefault(0)
                         )
@@ -947,6 +979,7 @@ public class ReaderSpecs {
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
 
 
+        /* Is 'Reader.foldLeft(FreeMonoid)' really needed/valuable?
         // Using Reader's built-in Maybe transformation 3 (+ a free monoid for folding)
         // Sequence<Lazy<Integer>>
         System.out.println();
@@ -963,8 +996,10 @@ public class ReaderSpecs {
                 .foldLeft(INTEGERS_UNDER_ADDITION_MONOID);
         System.out.println(foldedSequenceOfIntegers);
         assertThat(foldedSequenceOfIntegers).isGreaterThanOrEqualTo(0);
+        */
 
 
+        /*
         // Sequence<Reader<Integer>>
         System.out.println();
         System.out.println("Using on-the-fly monoid structure for folding \"flaky\" 'Sequence<Reader<Integer>>'");
@@ -998,8 +1033,10 @@ public class ReaderSpecs {
             .tryGet();
         System.out.println(foldedValue);
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
+        */
 
 
+        /*
         // Sequence<Reader<Integer>>
         System.out.println();
         System.out.println("Using 'FreeMonoid' for folding \"flaky\" 'Sequence<Reader<Integer>>'");
@@ -1024,6 +1061,7 @@ public class ReaderSpecs {
             .tryGet();
         System.out.println(foldedValue);
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
+        */
     }
 
     // NB! Ad-hoc experimentations
@@ -1086,7 +1124,8 @@ public class ReaderSpecs {
             .of(monoid.deferredIdentity())
             //.of(lazyMonoid.identityElement)
 
-            .apply(delayedRandomIntegerOrBottomReader
+            .apply(Reader
+                .of(delayedRandomIntegerOrBottomSupplier)
                 .map(new Function<Integer, Function<? super Integer, ? extends Integer>>() {
                          @Override
                          public Function<? super Integer, ? extends Integer> apply(Integer int1) {
@@ -1101,10 +1140,9 @@ public class ReaderSpecs {
                 )
             )
             //.apply(delayedRandomNumberOrBottomReader.map2(curriedPlus, 0))
-            .apply(delayedRandomIntegerOrBottomReader.map(
-                monoid.curriedBinaryOperation()//,
-                //monoid.identityElement
-            ));
+            .apply(Reader
+                .of(delayedRandomIntegerOrBottomSupplier)
+                .map(monoid.curriedBinaryOperation()));
 
         foldedValue = integerReader.toMaybe().getOrDefault(0);
         System.out.println(foldedValue);
@@ -1121,6 +1159,9 @@ public class ReaderSpecs {
         Supplier<Integer> slowAndFragileOperation1 = delayedRandomIntegerOrBottomSupplier;
         Supplier<Integer> slowAndFragileOperation2 = delayedRandomIntegerOrBottomSupplier;
         Supplier<Integer> slowAndFragileOperation3 = delayedRandomIntegerOrBottomSupplier;
+        Supplier<Maybe<Integer>> slowAndFragileOperation4 = delayedMaybeRandomIntegerSupplier;
+        Supplier<Maybe<Integer>> slowAndFragileOperation5 = delayedMaybeRandomIntegerSupplier;
+        Supplier<Maybe<Integer>> slowAndFragileOperation6 = delayedMaybeRandomIntegerSupplier;
 
         int defaultValue = monoid.identityElement; // If map does not return a value
         Function<Integer, Function<Integer, Integer>> appendFunction = monoid.curriedBinaryOperation();
@@ -1130,15 +1171,118 @@ public class ReaderSpecs {
         Reader<Integer> reader2 = Reader.of(slowAndFragileOperation2);
         Reader<Integer> reader3 = Reader.of(slowAndFragileOperation3);
 
+        Reader<Maybe<Integer>> reader4 = Reader.of(slowAndFragileOperation4);
+        Reader<Maybe<Integer>> reader5 = Reader.of(slowAndFragileOperation5);
+        Reader<Maybe<Integer>> reader6 = Reader.of(slowAndFragileOperation6);
+
+
+        // Computation with a provided default value compensating for bottom values
+        // Kind'a hacky/imprecise...
         Reader<Integer> deferredComputation = readerIdentity
             .apply(reader1.map(appendFunction, defaultValue))
             .apply(reader2.map(appendFunction, defaultValue))
             .apply(reader3.map(appendFunction, defaultValue));
 
-        System.out.println("Executing (deferred) computation...");
+        System.out.println("Executing (deferred) computation 1...");
         // Blocks!
         int foldedValue = deferredComputation.tryGet();
         System.out.println(foldedValue);
+        assertThat(foldedValue).isGreaterThanOrEqualTo(0);
+
+
+        /* Kind'a silly
+        // All-or-nothing computation with a 'Maybe' compensating for one or more bottom values
+        Maybe<Reader<Integer>> deferredComputation2 =
+            just(
+                readerIdentity
+                    .apply(reader1.map(appendFunction))
+                    .apply(reader2.map(appendFunction))
+                    .apply(reader3.map(appendFunction))
+            );
+
+        System.out.println("Executing (deferred) computation 2...");
+        // Blocks!
+        foldedValue = deferredComputation2.fold(
+            // onNothing
+            new Supplier<Integer>() {
+                @Override
+                public Integer get() {
+                    //return null;
+                    throw new RuntimeException();
+                }
+            },
+            // onJust
+            new Function<Reader<Integer>, Integer>() {
+                @Override
+                public Integer apply(Reader<Integer> readerInteger) {
+                    return readerInteger
+                        //.tryGet();
+                        .toMaybe()
+                        .getOrNull()
+                        ;
+                }
+            }
+        );
+        System.out.println("OK");
+        System.out.printf("foldedValue=%d%n", foldedValue);
+        */
+
+
+        // All-or-nothing computation with a 'Maybe' compensating for one or more bottom values
+        Maybe<Integer> deferredComputation3 =
+            readerIdentity
+                .apply(reader1.map(appendFunction))
+                .apply(reader2.map(appendFunction))
+                .apply(reader3.map(appendFunction))
+                .toMaybe();
+        System.out.println("Executing (deferred) computation 3...");
+        // Blocks!
+        deferredComputation3.fold(
+            // onNothing
+            () -> {
+                System.out.println("FAILED");
+                //throw new RuntimeException();
+                return null;
+            },
+            // onJust
+            (justFoldedValue) -> {
+                System.out.println("OK");
+                System.out.printf("foldedValue=%d%n", justFoldedValue);
+                assertThat(justFoldedValue).isGreaterThanOrEqualTo(0);
+                return null;
+            }
+        );
+
+
+        // Computation with the individual append function providing the robustness via a 'Maybe'
+        Reader<Integer> deferredComputation4 =
+            readerIdentity
+                .apply(reader4.map(
+                    (maybeInteger) -> maybeInteger.fold(
+                        // onNothing
+                        () -> (ignored) -> defaultValue,
+                        // onJust
+                        appendFunction
+                    ))
+                )
+                .apply(reader5.map(
+                    (maybeInteger) -> maybeInteger.fold(
+                        () -> (ignored) -> defaultValue,
+                        appendFunction
+                    ))
+                )
+                .apply(reader6.map(
+                    (maybeInteger) -> maybeInteger.fold(
+                        () -> (ignored) -> defaultValue,
+                        appendFunction
+                    ))
+                );
+
+        System.out.println("Executing (deferred) computation 4...");
+        // Blocks!
+        // Safe folding of overall reader
+        foldedValue = deferredComputation4.tryGet();
+        System.out.printf("foldedValue=%d%n", foldedValue);
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
     }
 
@@ -1149,7 +1293,7 @@ public class ReaderSpecs {
         FreeMonoid<Integer> monoid = INTEGERS_UNDER_ADDITION_MONOID;
 
         System.out.println("Building deferred computational structure...");
-        Supplier<String> slowAndFragileOperation = ReaderSpecs::getRandomlyDelayedOrTimedOutRandomString;
+        Supplier<String> slowAndFragileOperation = TestData::getRandomlyDelayedStringOrTimeoutException;
 
         Reader<String> reader = Reader.of(slowAndFragileOperation);
 
@@ -1227,6 +1371,7 @@ public class ReaderSpecs {
         System.out.println(foldedValue);
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
 
+        /*
         System.out.println();
         System.out.println("Folding non-left values (via pre-declared free monoid)...");
         foldedValue = seqOfEithers
@@ -1235,6 +1380,7 @@ public class ReaderSpecs {
             .tryGet();
         System.out.println(foldedValue);
         assertThat(foldedValue).isGreaterThanOrEqualTo(0);
+        */
     }
 
     /* TODO: Consider:
@@ -1298,43 +1444,47 @@ public class ReaderSpecs {
 
     @Test
     void toEither_whenMappingToBottomAsRuntimeException_shouldReturnLeft() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .map((integer) -> {
                 throw new RuntimeException("Went south!");
             });
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("Went south!");
+        assertThat(reader.toEither().isLeft()).isTrue();
+        // TODO: Why not same here...?
+        assertThat(reader.toEither().tryGetLeft()).isNotSameAs("RuntimeException: Went south!");
+        assertThat(reader.toEither().tryGetLeft()).isEqualTo("RuntimeException: Went south!");
     }
 
     @Test
     void toEither_whenMappingToBottomAsNull_shouldReturnLeft() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .map((integer) -> null);
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("Cannot create an 'Either.Right' from a 'null' value");
+        assertThat(reader.toEither().isLeft()).isTrue();
+        assertThat(reader.toEither().tryGetLeft()).isSameAs("null as folded value");
     }
 
     @Test
     void toEither_whenBindingToBottomAsRuntimeException_shouldReturnLeft() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
-                    () -> { throw new RuntimeException("Went south!"); }
+                    () -> {throw new RuntimeException("Went south!");}
                 )
             );
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("Went south!");
+        assertThat(reader.toEither().isLeft()).isTrue();
+        // TODO: Why not same here...?
+        assertThat(reader.toEither().tryGetLeft()).isNotSameAs("RuntimeException: Went south!");
+        assertThat(reader.toEither().tryGetLeft()).isEqualTo("RuntimeException: Went south!");
     }
 
     @Test
     void toEither_whenBindingToBottomAsNull_shouldReturnLeft() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
@@ -1342,17 +1492,17 @@ public class ReaderSpecs {
                 )
             );
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().isLeft()).isTrue();
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toEither().tryGetLeft()).isSameAs("Cannot create an 'Either.Right' from a 'null' value");
+        assertThat(reader.toEither().isLeft()).isTrue();
+        assertThat(reader.toEither().tryGetLeft()).isSameAs("null as folded value");
     }
 
     @Test
     void toEither_whenMapping_shouldReturnRight() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .map((integer) -> integer + 1);
 
-        Either<String, Integer> maybeInteger = lazyHelloWorldLengthIsEvenNumber.toEither();
+        Either<String, Integer> maybeInteger = reader.toEither();
 
         assertThat(maybeInteger.isLeft()).isFalse();
         assertThat(maybeInteger.tryGet()).isGreaterThanOrEqualTo(2);
@@ -1365,40 +1515,40 @@ public class ReaderSpecs {
 
     @Test
     void toMaybe_whenMappingToBottomAsRuntimeException_shouldReturnNothing() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .map((integer) -> {
                 throw new RuntimeException();
             });
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
+        assertThat(reader.toMaybe().isNothing()).isTrue();
     }
 
     @Test
     void toMaybe_whenMappingToBottomAsNull_shouldReturnNothing() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .map((integer) -> null);
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
+        assertThat(reader.toMaybe().isNothing()).isTrue();
     }
 
     @Test
     void toMaybe_whenBindingToBottomAsRuntimeException_shouldReturnNothing() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
-                    () -> { throw new RuntimeException(); }
+                    () -> {throw new RuntimeException();}
                 )
             );
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
+        assertThat(reader.toMaybe().isNothing()).isTrue();
     }
 
     @Test
     void toMaybe_whenBindingToBottomAsNull_shouldReturnNothing() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .bind((integer) ->
                 Reader.of(
@@ -1406,16 +1556,16 @@ public class ReaderSpecs {
                 )
             );
 
-        assertThat(lazyHelloWorldLengthIsEvenNumber.toMaybe().isNothing()).isTrue();
+        assertThat(reader.toMaybe().isNothing()).isTrue();
     }
 
     @Test
     void toMaybe_whenMapping_shouldReturnJust() {
-        Reader<Integer> lazyHelloWorldLengthIsEvenNumber = Reader
+        Reader<Integer> reader = Reader
             .of(randomIntegerSupplier)
             .map((integer) -> integer + 1);
 
-        Maybe<Integer> maybeInteger = lazyHelloWorldLengthIsEvenNumber.toMaybe();
+        Maybe<Integer> maybeInteger = reader.toMaybe();
 
         assertThat(maybeInteger.isNothing()).isFalse();
         assertThat(maybeInteger.tryGet()).isGreaterThanOrEqualTo(2);

@@ -26,7 +26,7 @@ import land.plainfunctional.util.Arguments;
  * </p>
  *
  * <p>
- * If ignoring the mathematical roots of this concept, this Java interface would maybe have been named <code>Chainable</code>.
+ * Another name for this Java interface could maybe have been <code>Chainable</code>.
  * </p>
  *
  * @param <T> The type of the value inside the monadic context, or just, the monad type
@@ -37,7 +37,8 @@ public interface Monad<T> extends Applicative<T> {
     /**
      * Alias of <code>bind</code>.
      */
-    default <V, M extends Monad<V>> M then(Function<? super T, M> function) {
+    default <V, M extends Monad<V>>
+    M then(Function<? super T, M> function) {
         return bind(function);
     }
 
@@ -86,7 +87,8 @@ public interface Monad<T> extends Applicative<T> {
      * @return the new monad
      */
     //@SuppressWarnings("unchecked")
-    default <V, M extends Monad<V>> M bind(Function<? super T, M> function) {
+    default <V, M extends Monad<V>>
+    M bind(Function<? super T, M> function) {
         Arguments.requireNotNull(function, "'function' argument cannot be null");
 
         // TODO: Try:

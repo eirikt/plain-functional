@@ -95,8 +95,8 @@ public class Magma<T> {
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom values (Wikipedia)</a>
      */
     public T append(T element1, T element2) {
-        Arguments.requireNotNull(element1, "'element1' argument cannot be 'null'");
-        Arguments.requireNotNull(element2, "'element2' argument cannot be 'null'");
+        Arguments.requireNotNull(element1, "'element1' argument cannot be null");
+        Arguments.requireNotNull(element2, "'element2' argument cannot be null");
 
         if (element1.equals(element2)) {
             throw new IllegalArgumentException("Cannot append two equal element values in a magma");

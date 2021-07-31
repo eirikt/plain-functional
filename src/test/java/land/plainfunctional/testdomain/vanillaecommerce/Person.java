@@ -7,7 +7,7 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 // TODO: Make immutable
 public class Person extends AbstractRandomIntegerEntity implements Cloneable {
 
-    public static final Person IDENTITY = new Person();
+    private static final Person IDENTITY = new Person();
 
     public static Person identity() {
         return IDENTITY;

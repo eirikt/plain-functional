@@ -1,22 +1,27 @@
 package land.plainfunctional.monad;
 
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
+import land.plainfunctional.algebraicstructure.FreeMonoid;
 import land.plainfunctional.typeclass.Applicative;
+import land.plainfunctional.typeclass.FunctorExtras;
 import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
 
 import static java.util.function.Function.identity;
+import static land.plainfunctional.monad.Maybe.just;
+import static land.plainfunctional.monad.Maybe.nothing;
 import static land.plainfunctional.util.ReflectionUtils.createDefaultInstance;
 import static org.apache.commons.lang3.builder.ToStringStyle.SHORT_PREFIX_STYLE;
-import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCause;
 import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCauseMessage;
 
 /**
@@ -30,15 +35,15 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCauseMess
  * {@link Either} and {@link Maybe}, the {@link Reader} context represents <a href="https://en.wikipedia.org/wiki/Partial_function">partiality</a>.
  *
  * <p>
- * Reader monads are functions from an shared environment to a value,
+ * Reader monads are functions from a shared environment to a value,
  * making it possible to bind variables to external sources, for composition.
- * In this implementation, <code>Reader</code> monads are composable functions.
- * The {@link Supplier} which must be provided via the constructor, represents the "nullary" starting function.
- * Composing <code>Reader</code> functors (via <code>map</code>) is the same as <a href="https://en.wikipedia.org/wiki/Function_composition">function composition</a>.
+ * In this implementation, a {@link Supplier} parameter must be provided via the constructor,
+ * representing the "nullary" starting function.
+ * Composing {@link Reader} functors (via <code>map</code>) is the same as <a href="https://en.wikipedia.org/wiki/Function_composition">function composition</a>.
  * </p>
  *
  * <p>
- * Do notice; When evaluated, {@link Reader} instances will <i>"stop the world" (blocking the current thread)</i>,
+ * Do notice; When being evaluated, {@link Reader} instances will <i>"stop the world" (blocking the current thread)</i>,
  * while waiting for the value to be read from the environment.<br>
  * An (attempt on an) analogy might be a dinner recipe that you write yourself.
  * After composing it and listing up the ingredients, perhaps sorted by the most important ingredient&mdash;you
@@ -51,10 +56,22 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCauseMess
  * The <code>Reader</code> monad is also known as <code>Environment</code> and <code>Lazy</code>.
  * </p>
  *
+ * <p>
+ * <i>Observation</i>:<br>
+ * With the current implementation, use a {@link Promise} to accomplish everything a {@link Reader} can.
+ * If the semantics of {@link Reader} are not extended, the {@link Reader} class may be deprecated...
+ * The fever core monads, the better!
+ * Composition of well-defined monads is the goal.
+ * </p>
+ *
  * @param <T> The type of the deferred value
  * @see <a href="https://bartoszmilewski.com/2015/01/20/functors/">Functors → The Reader Functor</a>
  */
-public class Reader<T> implements Monad<T>, Future<T> {
+public class Reader<T> implements Monad<T>, FunctorExtras<T>, Future<T> {
+
+    // Switch for verbose logging to System.out/System.err
+    private static final boolean DO_VERBOSE_LOGGING = true;
+
 
     ///////////////////////////////////////////////////////////////////////////
     // Factory methods
@@ -65,37 +82,76 @@ public class Reader<T> implements Monad<T>, Future<T> {
      * <b>NB! The given type must have an available empty constructor.</b>
      */
     public static <T> Reader<T> asReader(Class<T> type) {
-        return of(() -> createDefaultInstance(type));
+        return of(createDefaultInstance(type));
+    }
+
+    /**
+     * Alias for <code>of(value)</code>.
+     */
+    public static <T> Reader<T> startingWith(T value) {
+        return of(value);
     }
 
     /**
      * Factory method for immediately available values.
+     * <i>NB! May block current thread due to evaluation of parameter value.</i>
      *
-     * @param value The supplied value to be put into this {@link Reader} functor
+     * @param value The deferred value to be put into this {@link Reader} functor
+     * @param <T>   The type of the deferred value
      * @return A {@link Reader} value
      */
-    public static <T> Reader<T> startingWith(T value) {
-        return of(() -> value);
-    }
-
-    static <T> Reader<T> of(T value) {
-        return Reader.of(() -> value);
+    public static <T> Reader<T> of(T value) {
+        return new Reader<>(() -> value);
     }
 
     /**
      * Factory method.
      *
-     * @param valueSupplier The supplied value to be put into this {@link Reader} functor
+     * @param valueSupplier The deferred value to be put into this {@link Reader} functor
+     * @param <T>           The type of the deferred value
      * @return A {@link Reader} value
      */
     public static <T> Reader<T> of(Supplier<T> valueSupplier) {
         return new Reader<>(valueSupplier);
     }
 
+    /**
+     * Factory method.
+     *
+     * <p>
+     * Parallel fetching of values, and then folding them using the provided monoid.
+     * </p>
+     *
+     * @param supplierSequence The enumerated deferred values to be folded into this {@link Reader} functor
+     * @param monoid           The monoid to be used for folding the deferred values
+     * @param <T>              The type of the deferred values
+     * @return A {@link Reader} {@link Maybe} value
+     */
+    public static <T> Reader<Maybe<T>> of(
+        Sequence<Supplier<? extends T>> supplierSequence,
+        FreeMonoid<T> monoid
+    ) {
+        return monoid
+            .toReaderIdentity()
+            .map(
+                supplierSequence.map(
+                    (supplier) -> (ignored) -> supplier.get()
+                )
+                , monoid
+            );
+    }
+
 
     ///////////////////////////////////////////////////////////////////////////
     // Data constructors
     ///////////////////////////////////////////////////////////////////////////
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // State
+    ///////////////////////////////////////////////////////////////////////////
+
+    protected Promise<T> promise;
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -109,24 +165,30 @@ public class Reader<T> implements Monad<T>, Future<T> {
 
 
     ///////////////////////////////////////////////////////////////////////////
-    // State
-    ///////////////////////////////////////////////////////////////////////////
-
-    protected Promise<T> promise;
-
-
-    ///////////////////////////////////////////////////////////////////////////
     // Methods
     ///////////////////////////////////////////////////////////////////////////
+
+    /**
+     * The <code>isDone</code> method (specified by the implemented {@link Reader} interface) delegates to this method.
+     *
+     * @return <code>true</code> if this {@link Reader} value is resolved
+     */
+    public boolean isResolved() {
+        if (isCancelled()) {
+            throw new CancellationException();
+        }
+        return this.promise.isDone();
+    }
 
 
     ///////////////////////////////////////////////////////////////////////////
     // Future
     ///////////////////////////////////////////////////////////////////////////
 
+    // Here: Implemented as an alias for 'isResolved</code>'
     @Override
     public boolean isDone() {
-        return this.promise.isDone();
+        return isResolved();
     }
 
     @Override
@@ -134,12 +196,24 @@ public class Reader<T> implements Monad<T>, Future<T> {
         return this.promise.isCancelled();
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @deprecated Use one of the folding methods instead&mdash;for explicit handling of bottom values.
+     */
     @Override
+    @Deprecated
     public T get() throws InterruptedException, ExecutionException {
         return this.promise.get();
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @deprecated Use one of the folding methods instead&mdash;for explicit handling of bottom values.
+     */
     @Override
+    @Deprecated
     public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
         return this.promise.get(timeout, unit);
     }
@@ -160,6 +234,10 @@ public class Reader<T> implements Monad<T>, Future<T> {
     }
 
     /**
+     * {@inheritDoc}
+     *
+     * <p>...</p>
+     *
      * The functor function.
      *
      * "Plain functionally" (Haskell-style), the functor function is defined as:
@@ -182,6 +260,9 @@ public class Reader<T> implements Monad<T>, Future<T> {
      * it must return an "<code>f</code> of <code>b</code>'s"&mdash;
      * and all this is the definition of the "map" function.
      *
+     * <p>...</p>
+     * TODO: ...
+     *
      * @param function     The map function
      * @param defaultValue If present (not <code>null</code>),
      *                     this parameter will be used as the mapping value if this {@link Reader} returns a bottom value.
@@ -195,30 +276,48 @@ public class Reader<T> implements Monad<T>, Future<T> {
         T defaultValue
     ) {
         Arguments.requireNotNull(function, "'function' argument cannot be null");
+
         return new Reader<>(
-            () -> defaultValue == null
-                ? function.apply(this.promise.tryGet())
-                : function.apply(toMaybe().getOrDefault(defaultValue))
+            (defaultValue == null)
+                ? () -> function.apply(this.promise.tryGet())
+                : () -> function.apply(toMaybe().getOrDefault(defaultValue))
         );
     }
 
-    /* TODO: Consider:
+    @Override
     public <V> Reader<Maybe<V>> map(
-        Function<? super T, ? extends V> function,
-        T defaultValue
-    ) {
-        throw new UnsupportedOperationException("Not yet implemented");
-    }
-    */
-
-    /* TODO: Consider:
-    public <V> Reader<V> map(
-        List<Function<? super T, ? extends V>> functorList,
+        Sequence<Function<? super T, ? extends V>> functionSequence,
         FreeMonoid<V> monoid
     ) {
-        return new Reader<>(() -> mapFold(functorList, monoid));
+        return new Reader<>(() -> mapFold(functionSequence, monoid));
     }
-    */
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>...</p>
+     *
+     * NB! Synchronous implementation;
+     * Will block the current thread and fetch the value of this {@link Reader}.
+     *
+     * @param effect The (side) effect
+     * @return this (unmodified) same {@link Reader} instance
+     */
+    @Override
+    public Reader<T> effect(Consumer<? super T> effect) {
+        // TODO: How to implement this? Blocking vs. non-blocking/best-effort
+
+        //if (this.promise.isResolved()) {
+        //    effect.accept(this.promise.resolvedValue);
+        //} else {
+        //    System.err.println("'Reader::effect' FAILED, value is not available");
+        //}
+
+        // NB! Blocks current thread!
+        effect.accept(this.promise.tryGet());
+
+        return this;
+    }
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -227,7 +326,7 @@ public class Reader<T> implements Monad<T>, Future<T> {
 
     @Override
     public Reader<T> pure(T value) {
-        return Reader.of(() -> value);
+        return new Reader<>(() -> value);
     }
 
     @Override
@@ -254,6 +353,7 @@ public class Reader<T> implements Monad<T>, Future<T> {
     public Reader<T> join() {
         return new Reader<>(
             () -> {
+                // NB! Blocks current thread!
                 T value = this.promise.tryGet();
 
                 if (value instanceof Reader<?>) {
@@ -303,11 +403,11 @@ public class Reader<T> implements Monad<T>, Future<T> {
         // NB! Blocks current thread!
         Either<String, T> either = toEitherWithRetry(numberOfRetries);
 
-        // Handles exceptions
+        // Partiality: Handles exceptions
         if (either.isLeft()) {
-            return Maybe.nothing();
+            return nothing();
         }
-        // Handles 'null'
+        // Partiality: Handles null values
         return Maybe.of(either.tryGet());
     }
 
@@ -337,12 +437,16 @@ public class Reader<T> implements Monad<T>, Future<T> {
         // NB! Blocks current thread!
         return foldWithRetry(
             numberOfRetries,
-            (exception) -> {
+            (maybeException) -> {
+                String failureReason = (maybeException.isNothing())
+                    ? "null as folded value"
+                    : getRootCauseMessage(maybeException.tryGet());
+
                 System.err.printf(
                     "'Reader::toEitherWithRetry' FAILED, returning 'Either.Left'/'Maybe.Nothing'. Reason: %s%n",
-                    getRootCauseMessage(exception)
+                    failureReason
                 );
-                return Either.left(getRootCause(exception).getMessage());
+                return Either.left(failureReason);
             },
             Either::right
         );
@@ -354,9 +458,7 @@ public class Reader<T> implements Monad<T>, Future<T> {
     ///////////////////////////////////////////////////////////////////////////
 
     /**
-     * <p>
      * Evaluate this {@link Reader} functor.
-     * </p>
      *
      * <p>
      * This method is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
@@ -368,64 +470,20 @@ public class Reader<T> implements Monad<T>, Future<T> {
     public T tryGet() {
         // NB! Blocks current thread!
         return fold(
-            (exception) -> { throw new RuntimeException(exception); },
+            (exception) -> {
+                throw new RuntimeException(
+                    (exception.isNothing())
+                        ? "null as folded value"
+                        : exception.tryGet().getMessage()
+                );
+            },
             identity()
         );
     }
 
     /**
-     * <p>
      * To <i>fold</i> a value means creating a new representation of it.
      * For {@link Reader} instances this will force execution/evaluation.
-     * </p>
-     *
-     * <p>
-     * In abstract algebra, this is known as a <i>catamorphism</i>.
-     * A catamorphism deconstructs (destroys) data structures
-     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
-     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
-     * </p>
-     *
-     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
-     * <p>
-     * <code>
-     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
-     * </code>
-     * </p>
-     *
-     * <p>
-     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
-     * together with an initial value of type <code>b</code>,
-     * is applied to a functor <code>f</code> of type <code>a</code>,
-     * returning a new value of type<code>b</code>.
-     * </p>
-     *
-     * <p>...</p>
-     *
-     * <p>
-     * As {@link Reader} is a single-value functor, there is no need for a <i>binary</i> function;
-     * It is replaced by an unary function, which transforms the single read value.
-     * Also, the need for an initial value is redundant;
-     * It is replaced by a special unary function in case this {@link Reader} return a bottom value, here an {@link Exception}, which is provided as the function parameter.
-     * </p>
-     *
-     * @param onRead Function (unary) (the "catamorphism") to be applied to the read value
-     * @param <V>    The type of the folded/returning value
-     * @return the folded value
-     */
-    public <V> V tryFold(Function<? super T, ? extends V> onRead) {
-        // NB! Blocks current thread!
-        return fold(
-            (exception) -> { throw new RuntimeException(exception); },
-            onRead
-        );
-    }
-
-    /**
-     * <p>
-     * To <i>fold</i> a value means creating a new representation of it.
-     * For {@link Reader} instances this will force execution/evaluation.
-     * </p>
      *
      * <p>
      * In abstract algebra, this is known as a <i>catamorphism</i>.
@@ -463,17 +521,15 @@ public class Reader<T> implements Monad<T>, Future<T> {
      * @return the folded value
      */
     public <V> V fold(
-        Function<Exception, ? extends V> onBottom,
+        Function<Maybe<Exception>, ? extends V> onBottom,
         Function<? super T, ? extends V> onRead
     ) {
         return foldWithRetry(0, onBottom, onRead);
     }
 
     /**
-     * <p>
      * To <i>fold</i> a value means creating a new representation of it.
      * For {@link Reader} instances this will force execution/evaluation.
-     * </p>
      *
      * <p>
      * In abstract algebra, this is known as a <i>catamorphism</i>.
@@ -502,7 +558,15 @@ public class Reader<T> implements Monad<T>, Future<T> {
      * As {@link Reader} is a single-value functor, there is no need for a <i>binary</i> function;
      * It is replaced by an unary function, which transforms the single read value.
      * Also, the need for an initial value is redundant;
-     * It is replaced by a special unary function in case this {@link Reader} return a bottom value, here an exception, which is provided as the function parameter.
+     * It is replaced by a special unary function in case this {@link Reader} return a bottom value, here an exception,
+     * which is provided as the function parameter.
+     * </p>
+     *
+     * <p>...</p>
+     *
+     * <p>
+     * TODO: ...
+     * As...
      * </p>
      *
      * @param numberOfRetries If folding fails, this function will retry folding 'numberOfRetries' times before invoking the 'onBottom' callback
@@ -513,34 +577,49 @@ public class Reader<T> implements Monad<T>, Future<T> {
      */
     public <V> V foldWithRetry(
         int numberOfRetries,
-        Function<Exception, ? extends V> onBottom,
+        Function<Maybe<Exception>, ? extends V> onBottom,
         Function<? super T, ? extends V> onRead
     ) {
         return foldWithRetry(numberOfRetries, numberOfRetries, onBottom, onRead);
     }
 
     /**
-     * Folding with recursion-based retry.
+     * Folding with a recursion-based retry mechanism included.
      *
      * @param retryIndex           The number of retries left for this function before invoking the 'onBottom' callback
      * @param totalNumberOfRetries The total number of retries this function will try before invoking the 'onBottom' callback
-     * @param onBottom             Function (unary) with the bottom value (exception) provided as the function parameter
+     * @param onBottom             Function (unary) maybe with the bottom value (exception) provided as the function parameter, <code>Maybe.Nothing</code> if the folded value is 'null'
      * @param onRead               Function (unary) (the "catamorphism") to be applied to the read value
      * @param <V>                  The type of the folded/returning value
      * @return the folded value
      */
-    <V> V foldWithRetry(
+    protected <V> V foldWithRetry(
         int retryIndex,
         int totalNumberOfRetries,
-        Function<Exception, ? extends V> onBottom,
+        Function<Maybe<Exception>, ? extends V> onBottom,
         Function<? super T, ? extends V> onRead
     ) {
         try {
             // NB! Blocks current thread!
-            return onRead.apply(get());
+            T foldedValue = get();
+            if (foldedValue == null) {
+                if (retryIndex > 0 && DO_VERBOSE_LOGGING) {
+                    System.out.printf(
+                        "'Reader::foldWithRetry' FAILED, retrying... (%d/%d)%n",
+                        retryIndex - 1, totalNumberOfRetries
+                    );
+                    return foldWithRetry(retryIndex - 1, totalNumberOfRetries, onBottom, onRead);
+                }
+                System.err.printf(
+                    "'Reader::foldWithRetry' FAILED, executing 'onBottom' 'Supplier' (\"nullary\" function). Reason: %s%n",
+                    "null as folded value"
+                );
+                return onBottom.apply(nothing());
+            }
+            return onRead.apply(foldedValue);
 
         } catch (Exception exception) {
-            if (retryIndex > 0) {
+            if (retryIndex > 0 && DO_VERBOSE_LOGGING) {
                 System.out.printf(
                     "'Reader::foldWithRetry' FAILED, retrying... (%d/%d)%n",
                     retryIndex - 1, totalNumberOfRetries
@@ -551,26 +630,27 @@ public class Reader<T> implements Monad<T>, Future<T> {
                 "'Reader::foldWithRetry' FAILED, executing 'onBottom' 'Supplier' (\"nullary\" function). Reason: %s%n",
                 getRootCauseMessage(exception)
             );
-            return onBottom.apply(exception);
+            return onBottom.apply(just(exception));
         }
     }
 
-    /* TODO: Consider:
-    public <V> V mapFold(
-        List<Function<? super T, ? extends V>> functorList,
+    @Override
+    public <V> Maybe<V> mapFold(
+        Sequence<Function<? super T, ? extends V>> functionSequence,
         FreeMonoid<V> monoid
     ) {
         if (isCancelled()) {
             throw new CancellationException();
         }
         try {
-            return Promise.mapFold(get(), functorList, monoid);
+            // NB! Blocks current thread!
+            return Maybe.of(Promise.tryMapFold(tryGet(), functionSequence, monoid));
 
         } catch (Exception exception) {
-            throw new RuntimeException(exception);
+            //exception.printStackTrace(System.err);
+            return nothing();
         }
     }
-    */
 
 
     ///////////////////////////////////////////////////////////////////////////
