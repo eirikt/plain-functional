@@ -3,16 +3,25 @@ package land.plainfunctional.monad;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.LongStream;
 
 import org.junit.jupiter.api.Test;
 
+import land.plainfunctional.algebraicstructure.FreeMonoid;
+import land.plainfunctional.testdomain.TestFunctions;
 import land.plainfunctional.testdomain.vanillaecommerce.Customer;
+import land.plainfunctional.testdomain.vanillaecommerce.Payment;
 import land.plainfunctional.testdomain.vanillaecommerce.Person;
 import land.plainfunctional.testdomain.vanillaecommerce.VipCustomer;
 import land.plainfunctional.typeclass.Applicative;
@@ -22,13 +31,18 @@ import static java.lang.String.format;
 import static java.lang.Thread.sleep;
 import static java.time.Duration.between;
 import static java.time.Instant.now;
+import static java.util.Arrays.asList;
+import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static land.plainfunctional.monad.Maybe.asMaybe;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
-import static land.plainfunctional.monad.ReaderSpecs.getDelayedInteger;
 import static land.plainfunctional.monad.Sequence.asSequence;
+import static land.plainfunctional.monad.TestData.CSV_MONOID;
+import static land.plainfunctional.monad.TestData.getDelayedInteger;
 import static land.plainfunctional.testdomain.TestFunctions.isEven;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -42,23 +56,22 @@ class SequenceSpecs {
     void shouldProhibitNullValues() {
         assertThatThrownBy(() -> Sequence.of((String) null))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'Sequence' cannot contain 'null' values");
+            .hasMessage("'Sequence' cannot contain null values");
 
         assertThatThrownBy(() -> Sequence.of("Value1", null, "Value2"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("'Sequence' cannot contain 'null' values");
+            .hasMessage("'Sequence' cannot contain null values");
     }
 
     @Test
     void shouldBeEmpty() {
-        Sequence<Integer> emptySequence = Sequence.of();
+        Sequence<Integer> emptySequence = Sequence.empty();
 
         assertThat(emptySequence).isNotNull();
         assertThat(emptySequence.isEmpty()).isTrue();
         assertThat(emptySequence.size()).isEqualTo(0);
 
-
-        Sequence<Integer> emptySequence2 = Sequence.empty();
+        Sequence<Integer> emptySequence2 = Sequence.of();
 
         assertThat(emptySequence2).isNotNull();
         assertThat(emptySequence2.isEmpty()).isTrue();
@@ -81,9 +94,8 @@ class SequenceSpecs {
         assertThat(sequence.size()).isEqualTo(6);
     }
 
-    // TODO: Keep?
     @Test
-    void should_() {
+    void shouldBeParametricPolymorphicCovariant() {
         Person person = new Person();
         person.name = "Paul";
 
@@ -105,14 +117,8 @@ class SequenceSpecs {
         Sequence<Customer> sequence2 = Sequence.of(customer, customer2, vipCustomer);
 
         Person foldedPerson = sequence2.foldLeft(
-            new VipCustomer(),
-            new BiFunction<Person, Customer, Person>() {
-                @Override
-                public Person apply(Person person, Customer customer) {
-                    return person;
-                    //return customer;
-                }
-            }
+            (person1, person2) -> person2,
+            Person.identity()
         );
         assertThat(foldedPerson).isNotNull();
         assertThat(foldedPerson).isInstanceOf(Person.class);
@@ -121,154 +127,6 @@ class SequenceSpecs {
 
         assertThat(sequence2.isEmpty()).isFalse();
         assertThat(sequence2.size()).isEqualTo(3);
-    }
-
-    // TODO: Keep?
-    @Test
-    void should__() {
-        Person person = new Person();
-        person.name = "Paul";
-
-        Customer customer = new Customer();
-        customer.name = "Chris";
-
-        Customer customer2 = new Customer();
-        customer2.name = "Chrissie";
-
-        VipCustomer vipCustomer = new VipCustomer();
-        vipCustomer.vipCustomerSince = OffsetDateTime.now();
-
-
-        Sequence<Person> sequence = Sequence.of(person, customer, customer2, vipCustomer);
-        assertThat(sequence.size()).isEqualTo(4);
-
-        Maybe<Sequence<Person>> maybeSequenceOfPersons = just(sequence);
-        Customer foldedPerson = maybeSequenceOfPersons.fold(
-            new Supplier<VipCustomer>() {
-                @Override
-                public VipCustomer get() {
-                    return new VipCustomer();
-                }
-            },
-            new Function<Sequence<Person>, VipCustomer>() {
-                @Override
-                public VipCustomer apply(Sequence<Person> personSequence) {
-                    return personSequence.foldLeft(
-                        new VipCustomer(),
-                        new BiFunction<VipCustomer, Person, VipCustomer>() {
-                            @Override
-                            public VipCustomer apply(VipCustomer vipCustomer, Person person) {
-                                return vipCustomer;
-                            }
-                        }
-                    );
-                }
-            }
-        );
-
-
-        Sequence<Customer> sequence2 = Sequence.of(customer, customer2, vipCustomer);
-        assertThat(sequence2.size()).isEqualTo(3);
-
-        Maybe<Sequence<Customer>> maybeSequenceOfCustomers = just(sequence2);
-        Person foldedPerson2 = maybeSequenceOfCustomers.fold(
-            new Supplier<VipCustomer>() {
-                @Override
-                public VipCustomer get() {
-                    return new VipCustomer();
-                }
-            },
-            new Function<Sequence<Customer>, VipCustomer>() {
-                @Override
-                public VipCustomer apply(Sequence<Customer> personSequence) {
-                    return personSequence.foldLeft(
-                        new VipCustomer(),
-                        new BiFunction<VipCustomer, Customer, VipCustomer>() {
-                            @Override
-                            public VipCustomer apply(VipCustomer vipCustomer, Customer person) {
-                                return vipCustomer;
-                            }
-                        }
-                    );
-                }
-            }
-        );
-        assertThat(foldedPerson).isNotNull();
-        assertThat(foldedPerson).isInstanceOf(VipCustomer.class);
-    }
-
-    // TODO: Keep?
-    @Test
-    void should___() {
-        Person person = new Person();
-        person.name = "Paul";
-
-        Customer customer = new Customer();
-        customer.name = "Chris";
-
-        Customer customer2 = new Customer();
-        customer2.name = "Chrissie";
-
-        VipCustomer vipCustomer = new VipCustomer();
-        vipCustomer.name = "William III";
-        vipCustomer.vipCustomerSince = OffsetDateTime.now();
-
-
-        Sequence<Person> sequence = Sequence.of(person, customer, customer2, vipCustomer);
-        assertThat(sequence.size()).isEqualTo(4);
-
-        Person foldedSequence = sequence.foldLeft(
-            new VipCustomer(),
-            new BiFunction<VipCustomer, Person, VipCustomer>() {
-                @Override
-                public VipCustomer apply(VipCustomer vipCustomer, Person person) {
-                    //throw new UnsupportedOperationException();
-                    //return null;
-                    //return new VipCustomer();
-                    return vipCustomer;
-                    // ClassCastException:
-                    //return vipCustomer.append((VipCustomer) person);
-                }
-            }
-        );
-        assertThat(foldedSequence).isNotNull();
-        assertThat(foldedSequence.name).isNull();
-
-        foldedSequence = sequence.foldLeft(
-            new Person(),
-            new BiFunction<Person, Person, Person>() {
-                @Override
-                public Person apply(Person accumulatedPerson, Person person) {
-                    return accumulatedPerson.append(person);
-                }
-            }
-        );
-        assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
-
-        foldedSequence = sequence.toMonoid(Person::append, Person.identity()).fold();
-        assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
-
-
-        // Nope!
-        //foldedSequence = sequence.foldRight(new Person(), Person::append);
-        //assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
-
-        foldedSequence = sequence.foldRight(
-            Person.identity(),
-            (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append)
-        );
-        assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
-
-        // Nope!
-        //Person.IDENTITY.name = "";
-        //foldedSequence = sequence.foldRight(Person::append, Person.identity());
-        //assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
-
-        foldedSequence = sequence.foldRight(
-            (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append),
-            Person.identity()
-        );
-        assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
     }
 
 
@@ -341,8 +199,8 @@ class SequenceSpecs {
         assertThat(F2.isEmpty()).isFalse();
         assertThat(F2.size()).isEqualTo(2L);
 
-        assertThat(F1._unsafe().get(0)).isEqualTo(11);
-        assertThat(F2._unsafe().get(0)).isEqualTo(11);
+        assertThat(F1.values.get(0)).isEqualTo(11);
+        assertThat(F2.values.get(0)).isEqualTo(11);
     }
 
 
@@ -356,7 +214,7 @@ class SequenceSpecs {
 
         assertThat(sequence.isEmpty()).isFalse();
         assertThat(sequence.size()).isEqualTo(1L);
-        assertThat(sequence._unsafe().get(0)).isEqualTo("JustDoIt");
+        assertThat(sequence.values.get(0)).isEqualTo("JustDoIt");
     }
 
     @Test
@@ -365,11 +223,9 @@ class SequenceSpecs {
 
         assertThat(sequence.isEmpty()).isFalse();
         assertThat(sequence.size()).isEqualTo(1L);
-        assertThat(sequence._unsafe().get(0)).isEqualTo(LocalDate.of(2010, 10, 13));
+        assertThat(sequence.values.get(0)).isEqualTo(LocalDate.of(2010, 10, 13));
     }
 
-    // TODO: ...
-    /*
     @Test
     void shouldComposeApplicativeEndoFunctors() {
         //Function<Integer, Function<Integer, Integer>> verboseCurriedPlus =
@@ -405,10 +261,7 @@ class SequenceSpecs {
 
         assertThat(maybeSum.tryGet()).isEqualTo(5);
     }
-    */
 
-    // TODO: ...
-    /*
     @Test
     void shouldComposeApplicativeFunctors() {
         Function<String, Function<String, Integer>> curriedStringLength =
@@ -423,10 +276,7 @@ class SequenceSpecs {
 
         assertThat(maybeSum.tryGet()).isEqualTo(8);
     }
-    */
 
-    // TODO: ...
-    /*
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeEndoFunctors_nothing() {
         Maybe<Integer> maybeSum = just(1)
@@ -447,7 +297,6 @@ class SequenceSpecs {
 
         assertThat(maybeSum.isNothing()).isTrue();
     }
-    */
 
     @Test
     void NB_whenApplyingSiblingApplicativeType_willThrowClassCastException() {
@@ -455,15 +304,13 @@ class SequenceSpecs {
             (int1) -> (int2) -> sum(int1, int2);
 
         assertThatThrownBy(
-            () -> Sequence
-                .of(1)
-                .apply(just(curriedPlus.apply(2)))
-                .apply(just(curriedPlus.apply(3)))
-                .apply(just(curriedPlus.apply(4)))
+            () -> Sequence.of(1)
+                          .apply(just(curriedPlus.apply(2)))
+                          .apply(just(curriedPlus.apply(3)))
+                          .apply(just(curriedPlus.apply(4)))
         ).isInstanceOf(ClassCastException.class)
          .hasMessageContaining("land.plainfunctional.monad.Maybe cannot be cast to land.plainfunctional.monad.Sequence");
     }
-
 
     @Test
     void shouldDoValidationAndStuffLikeThat_3() {
@@ -545,8 +392,6 @@ class SequenceSpecs {
         //assertThat(appendedSequence.size()).isEqualTo(6);
     }
 
-    // TODO: ...
-    /*
     @Test
     void whenPartialFunctionReturnsNull_shouldThrowException() {
         BinaryOperator<Integer> plus = Integer::sum;
@@ -561,7 +406,7 @@ class SequenceSpecs {
 
         assertThatThrownBy(
             () ->
-                withMaybe(Integer.class)
+                asMaybe(Integer.class)
                     .pure(1)
                     .apply(just(curriedPlus.apply(2)))
                     .apply(just(curriedPlus.apply(3)))
@@ -569,7 +414,7 @@ class SequenceSpecs {
                     .apply(just(nullFn.apply(100)))
                     .apply(just(curriedPlus.apply(4)))
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a null/non-existing (\"bottom\") value");
 
         // And when doing 'map' of curried binary functions
         assertThatThrownBy(
@@ -580,12 +425,9 @@ class SequenceSpecs {
                     .apply(just(3).map(nullFn))
                     .apply(just(4).map(curriedPlus))
         ).isInstanceOf(IllegalArgumentException.class)
-         .hasMessageContaining("Cannot create a 'Maybe.Just' from a 'null' value");
+         .hasMessageContaining("Cannot create a 'Maybe.Just' from a null/non-existing (\"bottom\") value");
     }
-    */
 
-    // TODO: ...
-    /*
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeFunctors_nothing() {
         Maybe<Integer> maybeStringLength = nothing()
@@ -608,24 +450,22 @@ class SequenceSpecs {
         assertThat(maybeStringLength.isNothing()).isTrue();
 
         maybeStringLength = just("One")
-            .apply(of(null))
+            .apply(Maybe.of(null))
         // Won't compile
         //.apply(just("Two"))
         ;
 
         assertThat(maybeStringLength.isNothing()).isTrue();
     }
-    */
 
-    // TODO: ...
-    /*
+    // TODO: Investigate further, and clean up...
     @Test
     void shouldDoAlgebraicOperationsOnApplicativeFunctors_just() {
         Function<String, Integer> stringLength = String::length;
 
-        //Function<? super String, Function<? super String, ? extends Integer>> curriedStringLength =
-        //    (string1) ->
-        //        (string2) -> stringLength.apply(string1) + stringLength.apply(string2);
+        Function<? super String, Function<? super String, ? extends Integer>> curriedStringLength =
+            (string1) ->
+                (string2) -> stringLength.apply(string1) + stringLength.apply(string2);
 
         BinaryOperator<Integer> plus = Integer::sum;
 
@@ -636,44 +476,39 @@ class SequenceSpecs {
                 (int2) -> plus.apply(int1, int2);
 
 
-        //Maybe<String> justOneString = just("One");
-        //Maybe<String> justTwoString = just("Two");
-        //Maybe<String> justThreeString = just("Three");
-        //Maybe<String> justFourString = just("Four");
+        Maybe<String> justOneString = just("One");
+        Maybe<String> justTwoString = just("Two");
+        Maybe<String> justThreeString = just("Three");
+        Maybe<String> justFourString = just("Four");
 
-        //Maybe<Integer> maybeOneStringLength = justOneString.map(String::length);
-        //Maybe<Integer> maybeTwoStringLength = justTwoString.map(String::length);
-        //Maybe<Integer> maybeThreeStringLength = justThreeString.map(String::length);
-        //Maybe<Integer> maybeFourStringLength = justFourString.map(String::length);
+        Maybe<Integer> maybeOneStringLength = justOneString.map(String::length);
+        Maybe<Integer> maybeTwoStringLength = justTwoString.map(String::length);
+        Maybe<Integer> maybeThreeStringLength = justThreeString.map(String::length);
+        Maybe<Integer> maybeFourStringLength = justFourString.map(String::length);
 
 
         //Maybe<Integer> maybeStringLength = justOneString
         //    .apply(just(curriedStringLength.apply("Two")))
-        //    .apply(just(curriedStringLength.apply("Four"))) // Compiler won't handle this
+        //    //.apply(just(curriedStringLength.apply("Four"))) // Compiler won't handle this
         //    ;
-
         //assertThat(maybeStringLength.isNothing()).isFalse();
-        //assertThat(maybeStringLength.tryGet()).isEqualTo(6);
+        //assertThat(maybeStringLength.tryGet()).isEqualTo(10);
 
         //Maybe<Integer> maybeStringLength = just("One")
         //    .apply(just("Two").map(curriedStringLength))
-        //    .apply(just("Three").map(curriedStringLength)) // Compiler won't handle this
+        //    //.apply(just("Three").map(curriedStringLength)) // Compiler won't handle this
         //    ;
+        //assertThat(maybeStringLength.isNothing()).isFalse();
+        //assertThat(maybeStringLength.tryGet()).isEqualTo(11);
 
         Maybe<Integer> maybeStringLength = just(0)
             .apply(just("One").map(stringLength).map(curriedPlus))
             .apply(just("Two").map(stringLength).map(curriedPlus))
             .apply(just("Three").map(stringLength).map(curriedPlus));
 
-        //assertThat(maybeStringLength.isNothing()).isFalse();
-        assertThat(maybeStringLength.tryGet()).isEqualTo(3 + 3 + 5);
+        assertThat(maybeStringLength.isNothing()).isFalse();
+        assertThat(maybeStringLength.tryGet()).isEqualTo(0 + 3 + 3 + 5);
 
-
-        /
-        BinaryOperator<Integer> plus = Integer::sum;
-
-        Function<Integer, Function<Integer, Integer>> curriedPlus =
-            (int1) -> (int2) -> plus.apply(int1, int2);
 
         Function<Integer, Integer> plusOne = (integer) -> integer + 1;
         Function<Integer, Integer> plusTwo = (integer) -> integer + 2;
@@ -687,46 +522,60 @@ class SequenceSpecs {
 
 
         Maybe<Integer> maybeSum = maybeOneStringLength
-            // TODO: Compiles, but yields 'java.lang.ClassCastException: land.plainfunctional.monad.MaybeSpecs$1 cannot be cast to land.plainfunctional.monad.Maybe'
-            .apply(
-                new Functor<Function<? super Integer, ? extends Integer>>() {
-                    @Override
-                    public <U> Functor<U> map(Function<? super Function<? super Integer, ? extends Integer>, ? extends U> function) {
-                        return Sequence.of(
-                            function.apply(
-                                (Function<Integer, Integer>) integer -> integer + 2
-                            )
-                        );
-                    }
-                })
-            .apply(
-                Sequence.of(
-                    (Function<Integer, Integer>) (int1) -> int1 + maybeTwoStringLength.getOrDefault(0)
-                )
-            )
-            .apply(
-                Sequence.of(
-                    new Function<Integer, Integer>() {
-                        @Override
-                        public Integer apply(Integer int1) {
-                            return curriedPlus.apply(int1).apply(maybeThreeStringLength.getOrDefault(0));
-                        }
-                    }
-                )
-            )
+            // TODO: Compiles, but yields 'java.lang.ClassCastException: land.plainfunctional.monad.SequenceSpecs$9 cannot be cast to land.plainfunctional.monad.Maybe'
+            //.apply(
+            //    new Applicative<Function<? super Integer, ? extends Integer>>() {
+            //        @Override
+            //        public Applicative<Function<? super Integer, ? extends Integer>> pure(Function<? super Integer, ? extends Integer> value) {
+            //            throw new UnsupportedOperationException();
+            //        }
+            //        @Override
+            //        public <V> Applicative<V> apply(Applicative<Function<? super Function<? super Integer, ? extends Integer>, ? extends V>> functionInContext) {
+            //            throw new UnsupportedOperationException();
+            //        }
+            //        @Override
+            //        public <U> Functor<U> map(Function<? super Function<? super Integer, ? extends Integer>, ? extends U> function) {
+            //            return Sequence.of(
+            //                function.apply(
+            //                    (Function<Integer, Integer>) integer -> integer + 2
+            //                )
+            //            );
+            //        }
+            //    }
+            //)
+
+            // TODO: Compiles, but yields 'java.lang.ClassCastException: land.plainfunctional.monad.Sequence cannot be cast to land.plainfunctional.monad.Maybe'
+            //.apply(
+            //    Sequence.of(
+            //        new Function<Integer, Integer>() {
+            //            @Override
+            //            public Integer apply(Integer int1) {
+            //                return curriedPlus.apply(int1).apply(maybeTwoStringLength.getOrDefault(0));
+            //            }
+            //        }
+            //    )
+            //)
+
+            // TODO: Compiles, but yields 'java.lang.ClassCastException: land.plainfunctional.monad.Sequence cannot be cast to land.plainfunctional.monad.Maybe'
+            //.apply(
+            //    Sequence.of(
+            //        (Function<Integer, Integer>) (int1) -> int1 + maybeThreeStringLength.getOrDefault(0)
+            //    )
+            //)
+
             .apply(just(plusFour))
-            //.apply(maybePlusFour) // Compiler won't handle this
+
+            // Compiler won't handle this
+            //.apply(maybePlusFour)
             ;
 
-        assertThat(maybeSum.tryGet()).isEqualTo(3 + 3 + 5 + 4);
-        /
+        //assertThat(maybeSum.tryGet()).isEqualTo(3);
+        assertThat(maybeSum.tryGet()).isEqualTo(3 + 4);
+        //assertThat(maybeSum.tryGet()).isEqualTo(3 + 3 + 5 + 4);
     }
-    */
 
-    // TODO: ...
-    /*
     @Test
-    void shouldDoAlgebraicOperationsOnApplicativeFunctors_2_just() {
+    void shouldDoAlgebraicOperationsOnApplicativeFunctors_just_2() {
         Function<Integer, String> getNegativeNumberInfo =
             (integer) ->
                 integer < 0
@@ -750,10 +599,7 @@ class SequenceSpecs {
 
         assertThat(maybeInfoString.tryGet()).isEqualTo("7 is a natural number, 7 is less or equal to 10");
     }
-    */
 
-    // TODO: ...
-    /*
     @Test
     void shouldDoValidationAndStuffLikeThat() {
         Function<String, Function<String, String>> curriedStringAppender =
@@ -774,7 +620,7 @@ class SequenceSpecs {
         Maybe<Integer> justMinus13 = just(-13);
         Maybe<Integer> just7 = just(7);
 
-        Maybe<String> maybeInfoString = Sequence.of(
+        Maybe<String> maybeInfoString = Maybe.of(
             just("")
                 .apply(justMinus13
                     .map(getGreaterThanTenInfo)
@@ -803,10 +649,10 @@ class SequenceSpecs {
             );
         assertThat(maybeInfoString.tryGet()).isEqualTo("");
 
-        maybeInfoString = Sequence.of(maybeInfoString.tryGet());
+        maybeInfoString = Maybe.of(maybeInfoString.tryGet());
         assertThat(maybeInfoString.tryGet()).isEqualTo("");
 
-        maybeInfoString = Sequence.of(
+        maybeInfoString = Maybe.of(
             maybeInfoString
                 .fold(
                     () -> null,
@@ -849,7 +695,67 @@ class SequenceSpecs {
         //);
         //assertThat(maybeInfoString.isNothing()).isTrue();
     }
-    */
+
+    @Test
+    void shouldDoValidationAndStuffLikeThat_2() {
+        Function<Integer, String> getNegativeNumberInfo =
+            (integer) ->
+                integer < 0
+                    ? format("%d is a negative number", integer)
+                    : CSV_MONOID.identityElement;
+
+        Function<Integer, String> getGreaterThanTenInfo =
+            (integer) ->
+                integer > 10
+                    ? format("%d is greater than 10", integer)
+                    : CSV_MONOID.identityElement;
+
+        Maybe<Integer> justMinus13 = just(-13);
+        Maybe<Integer> just7 = just(7);
+
+        Maybe<String> maybeInfoString = Maybe.of(
+            just(CSV_MONOID.identityElement)
+                .apply(justMinus13
+                    .map(getGreaterThanTenInfo)
+                    .map(CSV_MONOID.curriedBinaryOperation())
+                )
+                .apply(justMinus13
+                    .map(getNegativeNumberInfo)
+                    .map(CSV_MONOID.curriedBinaryOperation())
+                )
+                .fold(
+                    () -> null,
+                    (string) -> isBlank(string) ? null : string
+                )
+        );
+        assertThat(maybeInfoString.isNothing()).isFalse();
+        assertThat(maybeInfoString.tryGet()).isEqualTo("-13 is a negative number");
+
+        maybeInfoString = just(CSV_MONOID.identityElement)
+            .apply(
+                just7
+                    .map(getGreaterThanTenInfo)
+                    .map(CSV_MONOID.curriedBinaryOperation())
+            )
+            .apply(
+                just7
+                    .map(getNegativeNumberInfo)
+                    .map(CSV_MONOID.curriedBinaryOperation())
+            );
+        assertThat(maybeInfoString.tryGet()).isEqualTo("");
+
+        maybeInfoString = Maybe.of(maybeInfoString.tryGet());
+        assertThat(maybeInfoString.tryGet()).isEqualTo("");
+
+        maybeInfoString = Maybe.of(
+            maybeInfoString
+                .fold(
+                    () -> null,
+                    (string) -> isBlank(string) ? null : string
+                )
+        );
+        assertThat(maybeInfoString.isNothing()).isTrue();
+    }
 
 
     ///////////////////////////////////////////////////////////////////////////
@@ -903,8 +809,8 @@ class SequenceSpecs {
         assertThat(m_a.bind(f)).isEqualTo(f.apply(value));
 
         // Bonus
-        assertThat(m_a.bind(f)._unsafe().get(0)).isEqualTo(4);
-        assertThat(f.apply(value)._unsafe().get(0)).isEqualTo(4);
+        assertThat(m_a.bind(f).values.get(0)).isEqualTo(4);
+        assertThat(f.apply(value).values.get(0)).isEqualTo(4);
     }
 
     /**
@@ -982,16 +888,14 @@ class SequenceSpecs {
         assertThat(rhs.size()).isEqualTo(1L);
 
         // Bonus
-        // TODO: Make it compile again...
-        //assertThat(lhs._unsafe().get(0)).isTrue(); // => Even number
-        //assertThat(rhs._unsafe().get(0)).isTrue(); // => Even number
+        assertThat(lhs.values.get(0)).isTrue(); // => Even number
+        assertThat(rhs.values.get(0)).isTrue(); // => Even number
 
         // Bonus: Using 'map'
-        // TODO: Make it compile again...
-        //Sequence<Boolean> usingMap = m
-        //    .map(String::length)
-        //    .map(TestFunctions::isEven);
-        //assertThat(usingMap._unsafe().get(0)).isTrue(); // => Even number
+        Sequence<Boolean> usingMap = m
+            .map(String::length)
+            .map(TestFunctions::isEven);
+        assertThat(usingMap.values.get(0)).isTrue(); // => Even number
     }
 
 
@@ -999,30 +903,30 @@ class SequenceSpecs {
     // Misc. monad applications
     ///////////////////////////////////////////////////////////////////////////
 
-    /* TODO: ...
-    @Test
-    void when_shouldBind_0() {
-        Sequence<Integer> sequence = Sequence.of(1, 2, 3);
+    // N/A any more...
+    //@Test
+    //void shouldBind() {
+    //    Sequence<Integer> sequence = Sequence.of(1, 2, 3);
+    //
+    //    Function<Integer, Maybe<Integer>> f = (integer) -> just(integer);
+    //
+    //    //Sequence<Maybe<Integer>> mappedSequence = (Sequence<Maybe<Integer>>) sequence.bind(f);
+    //    ////Sequence<Maybe<Integer>> mappedSequence2 = sequence.safeBind(f);
+    //
+    //    //Maybe<Integer> classCastMappedSequence = sequence.bind(f);
+    //    Sequence<Integer> classCastMappedSequence2 = sequence.bind(f);
+    //    ////Maybe<Integer> classCastMappedSequence2 = sequence.safeBind(f);
+    //
+    //    int sum = classCastMappedSequence2.toFreeMonoid(Integer::sum, 0).fold();
+    //    assertThat(sum).isEqualTo(1 + 2 + 3);
+    //
+    //    Object o = sequence.bind(f);
+    //    Sequence<Maybe<Integer>> mappedSequence2 = (Sequence<Maybe<Integer>>) o;
+    //
+    //    assertThat(mappedSequence2.size()).isEqualTo(3);
+    //}
 
-        Function<Integer, Maybe<Integer>> f = (integer) -> just(integer);
-
-        //Sequence<Maybe<Integer>> mappedSequence = (Sequence<Maybe<Integer>>) sequence.bind(f);
-        ////Sequence<Maybe<Integer>> mappedSequence2 = sequence.safeBind(f);
-
-        //Maybe<Integer> classCastMappedSequence = sequence.bind(f);
-        Sequence<Integer> classCastMappedSequence2 = sequence.bind(f);
-        ////Maybe<Integer> classCastMappedSequence2 = sequence.safeBind(f);
-
-        int sum = classCastMappedSequence2.toFreeMonoid(Integer::sum, 0).fold();
-        assertThat(sum).isEqualTo(1 + 2 + 3);
-
-        Object o = sequence.bind(f);
-        Sequence<Maybe<Integer>> mappedSequence2 = (Sequence<Maybe<Integer>>) o;
-
-        assertThat(mappedSequence2.size()).isEqualTo(3);
-    }
-    */
-
+    // TODO: Complete these...
     @Test
     void when_shouldBind_00() {
         Sequence<Integer> sequence = Sequence.of(1, 2, 3);
@@ -1043,29 +947,27 @@ class SequenceSpecs {
     }
 
     @Test
-    void when_shouldBind() {
+    void whenBinding_shouldJoinLayeredSequences() {
         Sequence<Integer> sequence = Sequence.of(1, 2, 3);
 
         Function<Integer, Sequence<Integer>> integerElementRemover =
             (integer) -> Sequence.empty();
 
-        //Sequence<Integer> mappedSequence = sequence.map(integerElementRemover); // Nope
+        //Sequence<Integer> mappedSequence = sequence.map(integerElementRemover); // Nope, must be joined/flattened
         Sequence<Integer> mappedSequence = sequence.bind(integerElementRemover);
 
         assertThat(mappedSequence.isEmpty()).isTrue();
 
-        assertThat(mappedSequence.toMonoid(Integer::sum, 0).fold())
-            .isEqualTo(0);
+        assertThat(mappedSequence.foldLeft(Integer::sum, 0)).isEqualTo(0);
     }
 
     @Test
-    void when_shouldBind_1() {
+    void whenBinding_shouldExpandSequenceByJoiningLayeredSequences() {
         Sequence<Integer> sequence = Sequence.of(1, 2, 3);
 
         Function<Integer, Sequence<Integer>> integerElementDuplicator =
             (integer) -> Sequence.of(integer, integer);
 
-        //Sequence<Integer> mappedSequence = sequence.map(integerElementDuplicator); // Nope
         Sequence<Integer> mappedSequence = sequence.bind(integerElementDuplicator);
 
         assertThat(mappedSequence.isEmpty()).isFalse();
@@ -1074,14 +976,19 @@ class SequenceSpecs {
         assertThat(mappedSequence.foldLeft(Integer::sum, 0))
             .isEqualTo(1 + 1 + 2 + 2 + 3 + 3);
 
-        assertThat(mappedSequence.toMonoid(Integer::sum, 0).fold())
-            .isEqualTo(1 + 2 + 3);
+        assertThat(mappedSequence.foldRight(Integer::sum, 0))
+            .isEqualTo(1 + 1 + 2 + 2 + 3 + 3);
+
+        assertThat(
+            Sequence.of(new HashSet<>(mappedSequence.toJavaList())).foldRight(Integer::sum, 0)
+        ).isEqualTo(1 + 2 + 3);
     }
 
     @Test
-    void shouldDownCastWithBind() {
+    void whenBinding_shouldDownCast() {
         VipCustomer vipCustomer1 = new VipCustomer();
         VipCustomer vipCustomer2 = new VipCustomer();
+
         Sequence<VipCustomer> sequence = Sequence.of(vipCustomer1, vipCustomer2);
 
         Function<VipCustomer, Sequence<Customer>> vipRevoker =
@@ -1101,9 +1008,10 @@ class SequenceSpecs {
     }
 
     @Test
-    void shouldUpCastWithBind() {
+    void whenBinding_shouldUpCast() {
         Customer customer1 = new Customer();
         Customer customer2 = new Customer();
+
         Sequence<Customer> customers = Sequence.of(customer1, customer2);
 
         Function<Customer, Sequence<VipCustomer>> vipPromoter =
@@ -1305,8 +1213,7 @@ class SequenceSpecs {
 
     @Test
     void shouldAppendElement() {
-        Sequence<Integer> seq1 = Sequence
-            .of(1, 2, 3);
+        Sequence<Integer> seq1 = Sequence.of(1, 2, 3);
 
         assertThat(seq1.isEmpty()).isFalse();
         assertThat(seq1.size()).isEqualTo(3);
@@ -1325,14 +1232,12 @@ class SequenceSpecs {
 
     @Test
     void shouldAppendElements() {
-        Sequence<Integer> seq1 = Sequence
-            .of(1, 2, 3);
+        Sequence<Integer> seq1 = Sequence.of(1, 2, 3);
 
         assertThat(seq1.isEmpty()).isFalse();
         assertThat(seq1.size()).isEqualTo(3);
 
-        Sequence<Integer> seq2 = Sequence
-            .of(1, 2, 3);
+        Sequence<Integer> seq2 = Sequence.of(1, 2, 3);
 
         assertThat(seq1).isEqualTo(seq2);
         assertThat(seq1).isNotSameAs(seq2);
@@ -1359,31 +1264,23 @@ class SequenceSpecs {
 
     @Test
     void shouldFold() {
-        int min = Sequence
-            .of("one", "two", "three", "four")
-            .map(String::length)
-            .toMonoid(Integer.MAX_VALUE, Integer::min)
-            .fold();
+        int min = Sequence.of("one", "two", "three", "four")
+                          .map(String::length)
+                          .foldLeft(Integer.MAX_VALUE, Integer::min);
         assertThat(min).isEqualTo(3);
 
-        int max = Sequence
-            .of("one", "two", "three", "four")
-            .map(String::length)
-            .toMonoid(Integer.MIN_VALUE, Integer::max)
-            .fold();
+        int max = Sequence.of("one", "two", "three", "four")
+                          .map(String::length)
+                          .foldLeft(Integer.MIN_VALUE, Integer::max);
         assertThat(max).isEqualTo(5);
 
-        int sum = Sequence
-            .of("one", "two", "three", "four")
-            .map(String::length)
-            .toMonoid(0, Integer::sum)
-            .fold();
-        // Monoid behaviour: Two 3 values => One 3 value
-        assertThat(sum).isEqualTo(3 + 5 + 4);
+        int sum = Sequence.of("one", "two", "three", "four")
+                          .map(String::length)
+                          .foldLeft(0, Integer::sum);
+        assertThat(sum).isEqualTo(3 + 3 + 5 + 4);
 
-        sum = Sequence
-            .of("one", "two", "three", "four", "five", "six")
-            .foldLeft(0, (foldedValue, string) -> foldedValue + string.length());
+        sum = Sequence.of("one", "two", "three", "four", "five", "six")
+                      .foldLeft(0, (foldedValue, string) -> foldedValue + string.length());
         assertThat(sum).isEqualTo(3 + 3 + 5 + 4 + 4 + 3);
 
         // TODO: Rewrite to plain-functional :-)
@@ -1400,7 +1297,7 @@ class SequenceSpecs {
 
         String foldedString = Sequence
             .of("one", "two", "three", "four", "five", "six")
-            .toMonoid(
+            .foldLeft(
                 "",
                 //(string1, string2) -> {
                 //    List<Character> filteredCharacterList = string2
@@ -1414,8 +1311,7 @@ class SequenceSpecs {
                 //        .map(Object::toString)
                 //        .collect(joining());
                 //})
-                keepOnlyCharacter.apply('e'))
-            .fold();
+                keepOnlyCharacter.apply('e'));
         assertThat(foldedString).isEqualTo("eeee");
 
         // TODO: Rewrite to plain-functional :-)
@@ -1430,11 +1326,274 @@ class SequenceSpecs {
                     .map(Object::toString)
                     .collect(joining());
 
-        foldedString = Sequence
-            .of("one", "two", "three", "four", "five", "six")
-            .map(keepOnlyChar.apply('e'))
-            .foldLeft("", String::concat);
+        foldedString = Sequence.of("one", "two", "three", "four", "five", "six")
+                               .map(keepOnlyChar.apply('e'))
+                               .foldLeft("", String::concat);
         assertThat(foldedString).isEqualTo("eeee");
+    }
+
+    // TODO: Complete these...
+    // TODO: Keep?
+    @Test
+    void should__() {
+        Person person = new Person();
+        person.name = "Paul";
+
+        Customer customer = new Customer();
+        customer.name = "Chris";
+
+        Customer customer2 = new Customer();
+        customer2.name = "Chrissie";
+
+        VipCustomer vipCustomer = new VipCustomer();
+        vipCustomer.vipCustomerSince = OffsetDateTime.now();
+
+
+        Sequence<Person> sequence = Sequence.of(person, customer, customer2, vipCustomer);
+        assertThat(sequence.size()).isEqualTo(4);
+
+        Maybe<Sequence<Person>> maybeSequenceOfPersons = just(sequence);
+        Customer foldedPerson = maybeSequenceOfPersons.fold(
+            new Supplier<VipCustomer>() {
+                @Override
+                public VipCustomer get() {
+                    return new VipCustomer();
+                }
+            },
+            new Function<Sequence<Person>, VipCustomer>() {
+                @Override
+                public VipCustomer apply(Sequence<Person> personSequence) {
+                    return personSequence.foldLeft(
+                        new VipCustomer(),
+                        new BiFunction<VipCustomer, Person, VipCustomer>() {
+                            @Override
+                            public VipCustomer apply(VipCustomer vipCustomer, Person person) {
+                                return vipCustomer;
+                            }
+                        }
+                    );
+                }
+            }
+        );
+
+
+        Sequence<Customer> sequence2 = Sequence.of(customer, customer2, vipCustomer);
+        assertThat(sequence2.size()).isEqualTo(3);
+
+        Maybe<Sequence<Customer>> maybeSequenceOfCustomers = just(sequence2);
+        Person foldedPerson2 = maybeSequenceOfCustomers.fold(
+            new Supplier<VipCustomer>() {
+                @Override
+                public VipCustomer get() {
+                    return new VipCustomer();
+                }
+            },
+            new Function<Sequence<Customer>, VipCustomer>() {
+                @Override
+                public VipCustomer apply(Sequence<Customer> personSequence) {
+                    return personSequence.foldLeft(
+                        new VipCustomer(),
+                        new BiFunction<VipCustomer, Customer, VipCustomer>() {
+                            @Override
+                            public VipCustomer apply(VipCustomer vipCustomer, Customer person) {
+                                return vipCustomer;
+                            }
+                        }
+                    );
+                }
+            }
+        );
+        assertThat(foldedPerson).isNotNull();
+        assertThat(foldedPerson).isInstanceOf(VipCustomer.class);
+    }
+
+    // TODO: Keep?
+    @Test
+    void should___() {
+        Person person = new Person();
+        person.name = "Paul";
+
+        Customer customer = new Customer();
+        customer.name = "Chris";
+
+        Customer customer2 = new Customer();
+        customer2.name = "Chrissie";
+
+        VipCustomer vipCustomer = new VipCustomer();
+        vipCustomer.name = "William III";
+        vipCustomer.vipCustomerSince = OffsetDateTime.now();
+
+
+        Sequence<Person> sequence = Sequence.of(person, customer, customer2, vipCustomer);
+        assertThat(sequence.size()).isEqualTo(4);
+
+        Person foldedSequence = sequence.foldLeft(
+            new VipCustomer(),
+            new BiFunction<VipCustomer, Person, VipCustomer>() {
+                @Override
+                public VipCustomer apply(VipCustomer vipCustomer, Person person) {
+                    //throw new UnsupportedOperationException();
+                    //return null;
+                    //return new VipCustomer();
+                    return vipCustomer;
+                    // ClassCastException:
+                    //return vipCustomer.append((VipCustomer) person);
+                }
+            }
+        );
+        assertThat(foldedSequence).isNotNull();
+        assertThat(foldedSequence.name).isNull();
+
+        foldedSequence = sequence.foldLeft(
+            new Person(),
+            new BinaryOperator<Person>() {
+                @Override
+                public Person apply(Person accumulatedPerson, Person person) {
+                    return accumulatedPerson.append(person);
+                }
+            }
+        );
+        assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
+
+        foldedSequence = sequence.parallelFold(new FreeMonoid<>(Person::append, Person.identity()));
+        assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
+
+
+        // Nope!
+        //foldedSequence = sequence.foldRight(new Person(), Person::append);
+        //assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
+
+        foldedSequence = sequence.foldRight(
+            Person.identity(),
+            (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append)
+        );
+        assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
+
+        // Nope!
+        //Person.IDENTITY.name = "";
+        //foldedSequence = sequence.foldRight(Person::append, Person.identity());
+        //assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
+
+        foldedSequence = sequence.foldRight(
+            (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append),
+            Person.identity()
+        );
+        assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Fold (catamorphism) semantics, in parallel
+    ///////////////////////////////////////////////////////////////////////////
+
+    // Ad-hoc test
+    //@Test
+    void shouldParallelFold_explicitPartitionSize() {
+        //int range = 0;
+        //long rangeSum = 0;
+        //int range = 1;
+        //long rangeSum = 1;
+        //int range = 2;
+        //long rangeSum = 3;
+        //int range = 3;
+        //long rangeSum = 6;
+        //int range = 4;
+        //long rangeSum = 10;
+        //int range = 5;
+        //long rangeSum = 15;
+        //int range = 10;
+        //long rangeSum = 55;
+        //int range = 100;
+        //long rangeSum = 5_050;
+        //int range = 1_000;
+        //long rangeSum = 500_500;
+        //int range = 10_000;
+        //long rangeSum = 50_005_000;
+        int range = 100_000;
+        long rangeSum = 5_000_050_000L;
+        //int range = 1_000_000;
+        //long rangeSum = 500_000_500_000L;
+
+        List<Integer> partitionSizeList = asList(
+            0, 1, 2, 4
+            //, 6, 8, 10, 14, 16, 18, 19, 20, 21, 22, 25, 30
+            //, 40, 50, 60, 70, 75, 80, 85, 90, 100, 125, 150, 200, 400, 800, 1200
+        );
+
+        for (int partitionSize : partitionSizeList) {
+            Instant startGenerating = now();
+            Supplier<Iterable<Long>> intSupplier = () -> {
+                Long[] intArray = new Long[range];
+                for (long i = 0; i < range; i += 1) {
+                    intArray[(int) i] = i + 1;
+                }
+                return asList(intArray);
+            };
+            Sequence<Long> sequenceOfLongs = Sequence.of(intSupplier);
+            Instant startProcessing = now();
+            long sum = sequenceOfLongs
+                .parallelFold(
+                    Long::sum,
+                    0L,
+                    partitionSize
+                );
+            System.out.println();
+            System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding, partition size: %d), generating took %d ms%n", partitionSize, between(startGenerating, startProcessing).toMillis());
+            System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding, partition size: %d), processing took %d ms%n", partitionSize, between(startProcessing, now()).toMillis());
+            assertThat(sequenceOfLongs.size()).isEqualTo(range); // 1-based
+            assertThat(sum).isEqualTo(rangeSum);
+        }
+    }
+
+    @Test
+    void shouldParallelFold() {
+        //int range = 0;
+        //long rangeSum = 0;
+        //int range = 1;
+        //long rangeSum = 1;
+        //int range = 2;
+        //long rangeSum = 3;
+        //int range = 3;
+        //long rangeSum = 6;
+        //int range = 4;
+        //long rangeSum = 10;
+        //int range = 5;
+        //long rangeSum = 15;
+        //int range = 10;
+        //long rangeSum = 55;
+        //int range = 100;
+        //long rangeSum = 5_050;
+        //int range = 1_000;
+        //long rangeSum = 500_500;
+        //int range = 10_000;
+        //long rangeSum = 50_005_000;
+        int range = 100_000;
+        long rangeSum = 5_000_050_000L;
+        //int range = 1_000_000;
+        //long rangeSum = 500_000_500_000L;
+
+        Instant startGenerating = now();
+        Supplier<Iterable<Long>> intSupplier = () -> {
+            Long[] intArray = new Long[range];
+            for (long i = 0; i < range; i += 1) {
+                intArray[(int) i] = i + 1;
+            }
+            return asList(intArray);
+        };
+        Sequence<Long> sequenceOfLongs = Sequence.of(intSupplier);
+        Instant startProcessing = now();
+        long sum = sequenceOfLongs
+            .parallelFold(
+                new FreeMonoid<>(
+                    Long::sum,
+                    0L
+                )
+            );
+        System.out.println();
+        System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding), processing took %d ms%n", between(startProcessing, now()).toMillis());
+        assertThat(sequenceOfLongs.size()).isEqualTo(range); // 1-based
+        assertThat(sum).isEqualTo(rangeSum);
     }
 
 
@@ -1487,21 +1646,91 @@ class SequenceSpecs {
     }
 
 
-    /* On-demand test
+    ///////////////////////////////////////////////////////////////////////////
+    // Partitioning
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Test
+    void partition_whenZeroElementsInPartitions_shouldThrowException_1() {
+        assertThatThrownBy(() ->
+            Sequence.empty().partition(0)
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessage("'partitionSize' argument cannot be less than one");
+    }
+
+    @Test
+    void partition_whenZeroElementsInPartitions_shouldThrowException_2() {
+        assertThatThrownBy(() ->
+            Sequence.of("Hello", "!").partition(0)
+        ).isInstanceOf(IllegalArgumentException.class)
+         .hasMessage("'partitionSize' argument cannot be less than one");
+    }
+
+    @Test
+    void partition_whenEmptyMonoid_shouldReturnEmptySequenceOfPartitions() {
+        Sequence<String> sequence = Sequence.empty();
+
+        assertThat(sequence.partition(1).isEmpty()).isTrue();
+    }
+
+    @Test
+    void partition_shouldDistributeMonoidElements_1() {
+        Sequence<String> sequence = Sequence.of("Hello", "!");
+
+        assertThat(sequence.partition(1).size()).isSameAs(2L);
+    }
+
+    // TODO: Complete these
+
+    @Test
+    void partition_shouldDistributeMonoidElements_2() {
+        Set<String> chronologicallyEnumeratedSet = new LinkedHashSet<>();
+        chronologicallyEnumeratedSet.add("Hello");
+        chronologicallyEnumeratedSet.add("World");
+        chronologicallyEnumeratedSet.add("!");
+
+        //MonoidStructure<String> monoid = new MonoidStructure<>(
+        //    chronologicallyEnumeratedSet,
+        //    (string1, string2) -> string1 + string2,
+        //    ""
+        //);
+
+        //assertThat(monoid.partition(2).size()).isSameAs(2L);
+        //assertThat(monoid.partition(1).toJavaList().get(0).size()).isSameAs(1L);
+        //assertThat(monoid.partition(1).toJavaList().get(1).size()).isSameAs(1L);
+
+        FreeMonoid<String> stringConcatenation = new FreeMonoid<>(
+            (string1, string2) -> string1 + string2,
+            ""
+        );
+
+        Sequence<String> sequence = Sequence.of(chronologicallyEnumeratedSet);
+
+        assertThat(sequence.partition(2).size()).isSameAs(2L);
+        assertThat(sequence.partition(1).toJavaList().get(0).size()).isSameAs(1L);
+        assertThat(sequence.partition(1).toJavaList().get(1).size()).isSameAs(1L);
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Parallel fold
+    ///////////////////////////////////////////////////////////////////////////
+
+    /* On-demand test */
     @Test
     void shouldFoldPrimitives() {
         //int range = 0;
         //long rangeSum = 0;
         //int range = 1;
         //long rangeSum = 1;
-        //int range = 3;
-        //long rangeSum = 6;
+        int range = 3;
+        long rangeSum = 6;
         //int range = 10;
         //long rangeSum = 55;
         //int range = 100;
         //long rangeSum = 5_050;
-        int range = 1_000;
-        long rangeSum = 500_500;
+        //int range = 1_000;
+        //long rangeSum = 500_500;
         //int range = 10_000;
         //long rangeSum = 50_005_000;
         //int range = 100_000;
@@ -1562,7 +1791,16 @@ class SequenceSpecs {
         startGenerating = now();
         Sequence<Long> sequenceOfLongs = Sequence.of(listOfLongs);
         startProcessing = now();
-        sum = sequenceOfLongs.toMonoid(Long::sum, 0L).fold();
+        sum = sequenceOfLongs
+            //.toMonoid(
+            //    Long::sum,
+            //    0L
+            //)
+            //.fold();
+            .foldLeft(
+                Long::sum,
+                0L
+            );
         System.out.println();
         //System.out.printf("Sum of int range: Plain functional Java, took %d ns%n", between(start, now()).toNanos());
         System.out.printf("Sum of int range: Plain functional Java (with ready-made array), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
@@ -1581,7 +1819,16 @@ class SequenceSpecs {
             //sequence = sequence.append(sequence.pure(i));
         }
         startProcessing = now();
-        sum = sequence.toMonoid(Long::sum, 0L).fold();
+        sum = sequence
+            //.toMonoid(
+            //    Long::sum,
+            //    0L
+            //)
+            //.fold();
+            .foldLeft(
+                Long::sum,
+                0L
+            );
         System.out.println();
         System.out.printf("Sum of int range: Plain functional Java, generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
         System.out.printf("Sum of int range: Plain functional Java, processing took %d ms%n", between(startProcessing, now()).toMillis());
@@ -1610,11 +1857,19 @@ class SequenceSpecs {
             //sequenceOfMaybeLongs = sequenceOfMaybeLongs.append(sequenceOfMaybeLongs.pure(just(i)));
         }
         startProcessing = now();
-        sum = sequenceOfMaybeLongs.toMonoid(
-            //(maybeLong1, maybeLong2) -> just(maybeLong1.tryGet() + maybeLong2.tryGet())
-            (maybeLong1, maybeLong2) -> maybeLong1.apply(maybeLong2.map(curriedLongSum)),
-            just(0L)
-        ).fold().tryGet();
+        sum = sequenceOfMaybeLongs
+            //.toMonoid(
+            //    //(maybeLong1, maybeLong2) -> just(maybeLong1.tryGet() + maybeLong2.tryGet())
+            //    (maybeLong1, maybeLong2) -> maybeLong1.apply(maybeLong2.map(curriedLongSum)),
+            //    just(0L)
+            //)
+            //.fold()
+            //.tryGet();
+            .foldLeft(
+                (maybeLong1, maybeLong2) -> maybeLong1.apply(maybeLong2.map(curriedLongSum)),
+                just(0L)
+            )
+            .tryGet();
         System.out.println();
         System.out.printf("Sum of int range: Plain functional Java (sequence of maybe values), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
         System.out.printf("Sum of int range: Plain functional Java (sequence of maybe values), processing took %d ms%n", between(startProcessing, now()).toMillis());
@@ -1633,7 +1888,16 @@ class SequenceSpecs {
         };
         sequenceOfLongs = Sequence.of(intSupplier);
         startProcessing = now();
-        sum = sequenceOfLongs.toMonoid(Long::sum, 0L).fold();
+        sum = sequenceOfLongs
+            //.toMonoid(
+            //    Long::sum,
+            //    0L
+            //)
+            //.fold();
+            .foldLeft(
+                Long::sum,
+                0L
+            );
         System.out.println();
         System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
         System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values), processing took %d ms%n", between(startProcessing, now()).toMillis());
@@ -1652,17 +1916,56 @@ class SequenceSpecs {
         };
         sequenceOfLongs = Sequence.of(intSupplier);
         startProcessing = now();
-        sum = sequenceOfLongs.toMonoid(Long::sum, 0L).parallelFold();
+        sum = sequenceOfLongs
+            //.toMonoid(
+            //    Long::sum,
+            //    0L
+            //)
+            //.parallelFold();
+            .parallelFold(
+                Long::sum,
+                0L,
+                1
+            );
+        System.out.println();
+        System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding), processing took %d ms%n", between(startProcessing, now()).toMillis());
+        assertThat(sequenceOfLongs.size()).isEqualTo(range); // 1-based
+        assertThat(sum).isEqualTo(rangeSum);
+
+
+        // Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding)
+        startGenerating = now();
+        intSupplier = () -> {
+            Long[] intArray = new Long[range];
+            for (long i = 0; i < range; i += 1) {
+                intArray[(int) i] = i + 1;
+            }
+            return asList(intArray);
+        };
+        sequenceOfLongs = Sequence.of(intSupplier);
+        startProcessing = now();
+        sum = sequenceOfLongs
+            //.toMonoid(
+            //    Long::sum,
+            //    0L
+            //)
+            //.parallelFold();
+            .parallelFold(
+                new FreeMonoid<>(
+                    Long::sum,
+                    0L
+                )
+            );
         System.out.println();
         System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
         System.out.printf("Sum of int range: Plain functional Java (sequence of supplied values) (parallel folding), processing took %d ms%n", between(startProcessing, now()).toMillis());
         assertThat(sequenceOfLongs.size()).isEqualTo(range); // 1-based
         assertThat(sum).isEqualTo(rangeSum);
     }
-    */
 
 
-    /* On-demand test
+    /* On-demand test */
     @Test
     void shouldFoldProductTypes() {
         int range = 1_000;
@@ -1741,8 +2044,8 @@ class SequenceSpecs {
 
             payment = new Payment(cardNumber, cardHolderName, expirationMonth, cvc, amount, isPaymentReceived);
         }
-        System.out.printf("\"Sum\" of Payments: Plain functional Java (sequence of maybe values), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
-        System.out.printf("\"Sum\" of Payments: Plain functional Java (sequence of maybe values), processing took %d ms%n", between(startProcessing, now()).toMillis());
+        System.out.printf("\"Sum\" of Payments: Regular Java, generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
+        System.out.printf("\"Sum\" of Payments: Regular Java, processing took %d ms%n", between(startProcessing, now()).toMillis());
         System.out.printf("Folded payment: %s%n", payment);
         assertThat(paymentList.size()).isEqualTo(range); // 1-based
         assertThat(payment).isNotNull();
@@ -1837,11 +2140,15 @@ class SequenceSpecs {
 
         startProcessing = now();
         payment = sequenceOfPayments
-            .toMonoid(
+            //.toMonoid(
+            //    Payment::append,
+            //    Payment.identity()
+            //)
+            //.fold()
+            .foldLeft(
                 Payment::append,
                 Payment.identity()
-            )
-            .fold();
+            );
 
         System.out.printf("\"Sum\" of Payments: Plain functional Java, generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
         System.out.printf("\"Sum\" of Payments: Plain functional Java, processing took %d ms%n", between(startProcessing, now()).toMillis());
@@ -1887,11 +2194,15 @@ class SequenceSpecs {
 
         startProcessing = now();
         payment = sequenceOfMaybePayments
-            .toMonoid(
+            //.toMonoid(
+            //    (maybePayment1, maybePayment2) -> maybePayment1.apply(maybePayment2.map(curriedAppend)),
+            //    just(Payment.identity())
+            //)
+            //.fold()
+            .foldLeft(
                 (maybePayment1, maybePayment2) -> maybePayment1.apply(maybePayment2.map(curriedAppend)),
                 just(Payment.identity())
             )
-            .fold()
             .tryGet();
 
         System.out.printf("\"Sum\" of Payments: Plain functional Java (sequence of maybe values), generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
@@ -1936,7 +2247,17 @@ class SequenceSpecs {
         );
 
         startProcessing = now();
-        payment = sequenceOfPayments.toMonoid(Payment.identity(), Payment::append).parallelFold();
+        payment = sequenceOfPayments
+            //.toMonoid(
+            //    Payment.identity(),
+            //    Payment::append
+            //).parallelFold();
+            .parallelFold(
+                new FreeMonoid<>(
+                    Payment::append,
+                    Payment.identity()
+                )
+            );
 
         System.out.printf("\"Sum\" of Payments: Plain functional Java [parallel folding II], generating took %d ms%n", between(startGenerating, startProcessing).toMillis());
         System.out.printf("\"Sum\" of Payments: Plain functional Java [parallel folding II], processing took %d ms%n", between(startProcessing, now()).toMillis());
@@ -1949,5 +2270,4 @@ class SequenceSpecs {
         assertThat(payment.expirationMonth).isEqualTo(firstRandomPayment.expirationMonth);
         // ...
     }
-    */
 }

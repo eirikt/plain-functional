@@ -1,10 +1,12 @@
 package land.plainfunctional.monad;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
@@ -16,7 +18,6 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 
 import land.plainfunctional.algebraicstructure.FreeMonoid;
-import land.plainfunctional.algebraicstructure.MonoidStructure;
 import land.plainfunctional.typeclass.Applicative;
 import land.plainfunctional.typeclass.Monad;
 import land.plainfunctional.util.Arguments;
@@ -53,7 +54,7 @@ public class Sequence<T> implements Monad<T> {
      * Just for having a {@link Sequence} instance to reach the member methods, e.g. <code>pure</code>.
      */
     public static <T> Sequence<T> asSequence() {
-        return asSequence(null);
+        return asSequence((Class<T>) null);
     }
 
     /**
@@ -61,6 +62,17 @@ public class Sequence<T> implements Monad<T> {
      */
     public static <T> Sequence<T> asSequence(Class<T> type) {
         return empty();
+    }
+
+    /**
+     * Alias for <code>of(values)</code>.
+     */
+    // TODO: Possible heap pollution from parameterized vararg type (=> @SafeVarargs)
+    // => https://www.baeldung.com/java-safevarargs
+    //@SafeVarargs
+    //@SuppressWarnings("varargs")
+    public static <T> Sequence<T> asSequence(T... values) {
+        return of(values);
     }
 
     /**
@@ -82,6 +94,8 @@ public class Sequence<T> implements Monad<T> {
      */
     // TODO: Possible heap pollution from parameterized vararg type (=> @SafeVarargs)
     // => https://www.baeldung.com/java-safevarargs
+    //@SafeVarargs
+    //@SuppressWarnings("varargs")
     public static <T> Sequence<T> of(T... values) {
         return new Sequence<>(values);
     }
@@ -116,7 +130,7 @@ public class Sequence<T> implements Monad<T> {
 
         // TODO: Is this too strict?
         // => So far, it works as a fail-fast policy...
-        Arguments.requireNotNull(value, "'Sequence' cannot contain 'null' values");
+        Arguments.requireNotNull(value, "'Sequence' cannot contain null values");
 
         this.values.add(value);
     }
@@ -128,7 +142,7 @@ public class Sequence<T> implements Monad<T> {
         for (T value : values) {
             // TODO: Is this too strict (and inefficient?)
             // => So far, it works as a fail-fast policy...
-            Arguments.requireNotNull(value, "'Sequence' cannot contain 'null' values");
+            Arguments.requireNotNull(value, "'Sequence' cannot contain null values");
 
             this.values.add(value);
         }
@@ -139,7 +153,7 @@ public class Sequence<T> implements Monad<T> {
         for (T value : iterable) {
             // TODO: Is this too strict (and inefficient?)
             // => So far, it works as a fail-fast policy...
-            Arguments.requireNotNull(value, "'Sequence' cannot contain 'null' values");
+            Arguments.requireNotNull(value, "'Sequence' cannot contain null values");
 
             this.values.add(value);
         }
@@ -176,17 +190,17 @@ public class Sequence<T> implements Monad<T> {
             try {
                 V mappedValue = function.apply(value);
 
-                // Partial function handling I:
+                // Partial function handling II:
                 // NB! Skipping inclusion as mapped value has no representation in the codomain
                 if (mappedValue == null) {
-                    System.err.printf("NB! 'Sequence::map': Skipping mapping! Value has no representation in the codomain (%s) (%s)%n", value, "'null'");
+                    System.err.printf("NB! 'Sequence::map' (partial function handling II): Skipping mapping! Value has no representation in the codomain (%s) (%s)%n", value, "'null'");
                     continue;
                 }
                 mappedValues.add(mappedValue);
 
             } catch (Exception exception) {
-                // Partial function handling II:
-                System.err.printf("NB! 'Sequence::map': Skipping mapping! Value has no representation in the codomain (%s) (%s)%n", value, exception);
+                // Partial function handling I:
+                System.err.printf("NB! 'Sequence::map' (partial function handling I): Skipping mapping! Value has no representation in the codomain (%s) (%s)%n", value, exception);
             }
         }
         return new Sequence<>(mappedValues);
@@ -217,19 +231,23 @@ public class Sequence<T> implements Monad<T> {
      *
      * <p>...</p>
      *
+     * <p>
      * This is a variant of <code>map</code> that maps the elements/values in parallel.
      * It is implemented by <i>first partitioning this sequence into sub-sequences based on the number of available logical processors</i>.
-     * These sub-sequences are then sequentially transformed from sequences of <code>T</code>-typed elements/values into a sequences of <code>Promise&lt;T&gt;</code>-typed elements/values,
+     * These sub-sequences are then sequentially transformed from sequences of <code>T</code>-typed elements/values into sequences of <code>Promise&lt;T&gt;</code>-typed elements/values,
      * to which the mapping function is applied.
      * Then all promises are evaluated simultaneously (in their own native threads), and then finally sequentially folded to <code>V</code>-typed elements/values,
      * and added to a new <code>Sequence&lt;V&gt;</code>.
+     * </p>
+     *
+     * <p>
      * Needless to say; This method brings some overhead.
-     * It uses the common static {@link java.util.concurrent.ForkJoinPool} (via the {@link Promise}'s {@link java.util.concurrent.CompletableFuture},
+     * It uses the common static {@link ForkJoinPool} (via the {@link Promise}'s {@link CompletableFuture},
      * so its efficiency depends on a lot of things:<br>
      * <ul>
      *     <li>the number of sequence elements/values</li>
-     *     <li>the nature of the mapping function&mdash;somewhat heavy, (pure) computational functions are good, while blocking tasks may obstruct other tasks using the common Fork/Join thread pool</li>
-     *     <li>the other activity in this JVM process and on this computer in general&mdash;CPUs are shared resources</li>
+     *     <li>the nature of the mapping function&mdash;somewhat heavy, (pure) computational functions are good, while blocking tasks may obstruct other tasks using the common Fork/Join thread pool (be careful with map functions which block the thread)</li>
+     *     <li>the other activities in this JVM process and on this computer in general&mdash;CPUs are shared resources</li>
      * </ul>
      *
      * @param function The map function
@@ -241,16 +259,19 @@ public class Sequence<T> implements Monad<T> {
         return parallelMap(function, getRuntime().availableProcessors() - 2);
     }
 
-    protected <V> Sequence<V> parallelMap(Function<? super T, ? extends V> function, int numberOfElementsInEachPartition) {
+    /**
+     * Recursive mapping in parallel <i>with partitioning</i>.
+     */
+    protected <V> Sequence<V> parallelMap(Function<? super T, ? extends V> function, Integer partitionSize) {
         Sequence<V> mappedSequence = Sequence.empty();
-        for (Sequence<T> subSequence : partition(numberOfElementsInEachPartition).values) {
+        for (Sequence<T> subSequence : partition(partitionSize).values) {
             mappedSequence = mappedSequence.append(subSequence.unconstrainedParallelMap(function));
         }
         return mappedSequence;
     }
 
     /**
-     * Mapping in parallel without partitioning.
+     * Recursive mapping in parallel <i>without partitioning</i>.
      */
     protected <V> Sequence<V> unconstrainedParallelMap(Function<? super T, ? extends V> function) {
         return
@@ -345,9 +366,9 @@ public class Sequence<T> implements Monad<T> {
                 Sequence<?> wrappedSequenceElement = ((Sequence<?>) element);
                 // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
                 // TODO: Well, also argue that this must be the case...
-                List<? extends T> _unsafeWrappedElements = (List<? extends T>) wrappedSequenceElement._unsafe();
+                List<? extends T> wrappedSequenceElementElements = (List<? extends T>) wrappedSequenceElement.values;
 
-                flattenedValues.addAll(_unsafeWrappedElements);
+                flattenedValues.addAll(wrappedSequenceElementElements);
 
             } else {
                 flattenedValues.add(element);
@@ -362,9 +383,16 @@ public class Sequence<T> implements Monad<T> {
     ///////////////////////////////////////////////////////
 
     /**
-     * Alias of <code>filter</code>.
+     * Alias for <code>filter</code>.
      */
     public Sequence<T> select(Predicate<T> predicate) {
+        return filter(predicate);
+    }
+
+    /**
+     * Alias of <code>filter</code>.
+     */
+    public Sequence<T> find(Predicate<T> predicate) {
         return filter(predicate);
     }
 
@@ -398,7 +426,7 @@ public class Sequence<T> implements Monad<T> {
      *
      * <p>
      * So, <code>filter</code> finds and returns all elements that satisfies the given predicate condition.
-     * This value projection operation is also known as 'find' and the relational 'select'.
+     * This projection operation is also known as 'find' and the relational 'select'.
      * </p>
      *
      * <p>
@@ -551,50 +579,138 @@ public class Sequence<T> implements Monad<T> {
         return foldedValue;
     }
 
-
-    ///////////////////////////////////////////////////////
-    // Partition
-    ///////////////////////////////////////////////////////
-
     /**
-     * Partition this promise based on the number of logical processors (hyper-threaded processor cores).
+     * Folds in parallel.
      *
-     * @return the sequence chopped up in sub-sequences having the size of logical processors, minus two
+     * <p>
+     * It is implemented by <i>first partitioning this associative set into sub-sets based on the number of available logical processors</i>.
+     * These sub-sets are then sequentially transformed from sets of <code>T</code>-typed elements/values into sets of <code>Promise&lt;T&gt;</code>-typed element/value pairs,
+     * to which the fold function is applied.
+     * Then all promises are evaluated simultaneously (in their own native threads), recursively until only one value remains.
+     * </p>
+     *
+     * <p>
+     * Needless to say; This method brings some overhead.
+     * It uses the common static {@link ForkJoinPool} (via the {@link Promise}'s {@link CompletableFuture},
+     * so its efficiency depends on a lot of things:<br>
+     * <ul>
+     *     <li>the number of sequence elements/values</li>
+     *     <li>the nature of the binary operation (append function)&mdash;somewhat heavy, (pure) computational functions are good, while blocking tasks may obstruct other tasks using the common Fork/Join thread pool (be careful with map functions which block the thread)</li>
+     *     <li>the other activities in this JVM process and on this computer in general&mdash;CPUs are shared resources</li>
+     * </ul>
+     *
+     * @param freeMonoid The free monoid to be used for folding this sequence
+     * @return the folded value
+     * @see <a href="https://en.wikipedia.org/wiki/Hyper-threading">Logical cores (in hyper-threading)</a>
      */
-    protected Sequence<Sequence<T>> partition() {
-        return partition(getRuntime().availableProcessors() - 2);
+    public T parallelFold(FreeMonoid<T> freeMonoid) {
+        Arguments.requireNotNull(freeMonoid, "'freeMonoid' argument cannot be null");
+
+        return parallelFold(
+            freeMonoid.binaryOperation,
+            freeMonoid.identityElement,
+            getDefaultPartitionSize()
+        );
     }
 
     /**
-     * Partition this promise into sub-sequences having the having the given size.
-     *
-     * @param numberOfElementsInEachPartition The number of elements/values in each sub-sequence
-     * @return the sequence chopped up in sub-sequences having the given size
+     * Recursive folding in parallel <i><b>with</b> partitioning</i>.
      */
-    protected Sequence<Sequence<T>> partition(int numberOfElementsInEachPartition) {
-        Sequence<Sequence<T>> partitionedSequence = null;
-        Sequence<T> subSequence = null;
+    protected T parallelFold(BinaryOperator<T> append, T identityValue, Integer partitionSize) {
+        //System.out.printf("parallelFold (%s)%n", this);
 
-        int elementCounterWithinPartition = 0;
+        Arguments.requireNotNull(append, "'append' argument cannot be null");
+        Arguments.requireNotNull(identityValue, "'identityValue' argument cannot be null");
+        Arguments.requireNotNull(partitionSize, "'partitionSize' argument cannot be null");
 
-        // TODO: Efficiency: Investigate the possibility using 'System.arrayCopy' or something in that ballpark ("Spliterators" even maybe)
-        for (T element : this.values) {
-            if (elementCounterWithinPartition % numberOfElementsInEachPartition == 0) {
-                partitionedSequence = (partitionedSequence == null)
-                    ? Sequence.empty()
-                    : partitionedSequence.append(subSequence);
-
-                subSequence = Sequence.empty();
-                elementCounterWithinPartition = 0;
-            }
-            if (elementCounterWithinPartition <= numberOfElementsInEachPartition) {
-                subSequence = subSequence.append(element);
-            }
-            elementCounterWithinPartition += 1;
+        // Recursion guard 1: Empty sequence => identity value
+        if (isEmpty()) {
+            //System.out.println("parallelFold: Recursion guard 1: Empty sequence => identity value");
+            return identityValue;
         }
-        partitionedSequence = partitionedSequence.append(subSequence);
+        // Recursion guard 2: Singleton sequence
+        if (size() < 2) {
+            //System.out.println("parallelFold: Recursion guard 2: Singleton sequence");
+            return this.values.get(0);
+        }
+        // Recursion guard 3: Single partition => no partitioning
+        if (partitionSize < 2) {
+            //System.out.println("parallelFold: Recursion guard 3: Single partition => no partitioning");
+            return unconstrainedParallelFold(append, identityValue);
+        }
+        return partition(partitionSize)
+            .map((subSequence) -> subSequence.unconstrainedParallelFold(append, identityValue))
+            .parallelFold(append, identityValue, partitionSize);
+    }
 
-        return partitionedSequence;
+    /**
+     * Recursive folding in parallel <i><b>without</b> partitioning</i>.
+     */
+    protected T unconstrainedParallelFold(BinaryOperator<T> append, T identityValue) {
+        //System.out.printf("unconstrainedParallelFold (%s)%n", this);
+
+        Arguments.requireNotNull(append, "'append' argument cannot be null");
+        Arguments.requireNotNull(identityValue, "'identityValue' argument cannot be null");
+
+        // Recursion guard 1: Empty sequence => identity value
+        if (isEmpty()) {
+            //System.out.println("unconstrainedParallelFold: parallelFold: Recursion guard 1: Empty sequence => identity value");
+            return identityValue;
+        }
+        // Recursion guard 2: Singleton sequence
+        if (size() < 2) {
+            //System.out.println("unconstrainedParallelFold: Recursion guard 2: Singleton sequence");
+            return this.values.get(0);
+        }
+        // Transform sequence of values to sequence of promises of pairs of elements
+        // The provided append function (fold/catamorphism) are then immediately applied (in parallel)
+        // (Threads are either fetched from the ForkJoinPool, or a new Thread is created per Promise evaluation)
+        Sequence<Promise<T>> promiseSequence = Sequence.empty();
+        Iterator<T> iterator = this.values.iterator();
+        while (iterator.hasNext()) {
+            T value1 = iterator.next();
+            // TODO: Fails for some reason...
+            //promiseSequence = promiseSequence.append(
+            //    (iterator.hasNext())
+            //        ? Promise.of(() -> append.apply(value1, iterator.next())).evaluate()
+            //        : Promise.of(value1)
+            //);
+            T value2 = (iterator.hasNext())
+                ? iterator.next()
+                : null;
+
+            Promise<T> promise = (value2 == null)
+                // Resolved value
+                ? Promise.of(value1)
+                // Async computation
+                : Promise.of(() -> append.apply(value1, value2));
+
+            promiseSequence = promiseSequence.append(
+                promise.evaluate()
+            );
+        }
+        return promiseSequence
+            .map(
+                // NB! Blocks current thread while completing promise evaluation, one by one
+                promise -> promise.fold(
+                    // When bottom value:
+                    (exception) -> {
+                        // Partial function handling I:
+                        System.err.printf("NB! 'Sequence::unconstrainedParallelFold': Skipping mapping! Bottom value has no representation in the codomain (%s)%n", exception.getMessage());
+                        return null;
+                    },
+                    // When successfully receiving the value:
+                    (foldedValue) -> {
+                        // Partial function handling II:
+                        if (foldedValue == null) {
+                            System.err.printf("NB! 'Sequence::unconstrainedParallelFold': Skipping mapping! Bottom value has no representation in the codomain (%s)%n", "'null'");
+                            return null;
+                        }
+                        return foldedValue;
+                    }
+                )
+            )
+            .unconstrainedParallelFold(append, identityValue);
     }
 
 
@@ -642,15 +758,90 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
-    // Transformations
+    // Partition
     ///////////////////////////////////////////////////////
 
     /**
-     * @return the internal data structure
+     * @return a hopefully suitable/optimized partition size based on the number of logical processors (hyper-threaded processor cores)
      */
-    protected List<? extends T> _unsafe() {
+    protected int getDefaultPartitionSize() {
+        //System.out.printf("Number of elements in each partition: %d%n", numberOfElementsInEachPartition);
+        return
+            // Number of logical processors (hyper-threaded processor cores), minus two which is probably busy for other threads...
+            (getRuntime().availableProcessors() - 2)
+                // Monoid has binary operation => multiplied by 2
+                * 2
+                // Ad-hoc "spatial processing constant"
+                // TODO: More ad-hoc testing; This constant is probably coupled with/affected by the binary operation's work load...
+                * 4;
+    }
+
+    /**
+     * Partition this promise based on the number of logical processors (hyper-threaded processor cores).
+     *
+     * @return the sequence chopped up in sub-sequences having the size of logical processors, minus two
+     */
+    protected Sequence<Sequence<T>> partition() {
+        return partition(getDefaultPartitionSize());
+    }
+
+    /**
+     * Partition this promise into sub-sequences having the having the given size.
+     *
+     * @param partitionSize The number of elements/values in each sub-sequence
+     * @return the sequence chopped up in sub-sequences having the given size
+     */
+    protected Sequence<Sequence<T>> partition(Integer partitionSize) {
+        Arguments.requireGreaterThanOrEqualTo(1, partitionSize, "'partitionSize' argument cannot be less than one");
+
+        Sequence<Sequence<T>> partitionedSequence = null;
+        Sequence<T> subSequence = null;
+
+        int elementCounterWithinPartition = 0;
+
+        // TODO: Efficiency: Investigate the possibility using 'System.arrayCopy' or something in that ballpark ("Spliterators" even maybe)
+        for (T element : this.values) {
+            if (elementCounterWithinPartition % partitionSize == 0) {
+                partitionedSequence = (partitionedSequence == null)
+                    ? Sequence.empty()
+                    : partitionedSequence.append(subSequence);
+
+                subSequence = Sequence.empty();
+                elementCounterWithinPartition = 0;
+            }
+            if (elementCounterWithinPartition <= partitionSize) {
+                subSequence = subSequence.append(element);
+            }
+            elementCounterWithinPartition += 1;
+        }
+        if (subSequence != null) {
+            partitionedSequence = partitionedSequence.append(subSequence);
+        }
+
+        return (partitionedSequence == null)
+            ? Sequence.empty()
+            : partitionedSequence;
+    }
+
+
+    ///////////////////////////////////////////////////////
+    // Transformations
+    ///////////////////////////////////////////////////////
+
+    /*
+     * @return the internal data structure (NB! breaks 'Sequence' immutability)
+     /
+    protected List<T> _unsafe() {
         return this.values;
     }
+
+    /
+     * @return the internal data structure as an 'Iterator' (NB! breaks 'Sequence' immutability)
+     /
+    protected Iterator<T> _iterator() {
+        return _unsafe().iterator();
+    }
+    */
 
     /**
      * @return a shallow copy of this sequence (of values)
@@ -659,10 +850,14 @@ public class Sequence<T> implements Monad<T> {
         return new ArrayList<>(this.values);
     }
 
-    /**
+    /*
+     * <i><b>NB!</b> Equal elements/values in this sequence will be omitted when transforming this sequence to a set-based monoid.</i>
+     *
      * @param freeMonoid free monoid (with a closed, associative binary operation and an identity element)
      * @return a new monoid structure based on this sequence's elements (as the monoid set), and the given free monoid
-     */
+     * @deprecated Equal elements/values in this sequence will be omitted when transforming this sequence to a set-based monoid
+     /
+    @Deprecated // Equal elements/values in this sequence will be omitted when transforming this sequence to a set-based monoid
     public MonoidStructure<T> toMonoid(FreeMonoid<T> freeMonoid) {
         return toMonoid(
             freeMonoid.binaryOperation,
@@ -670,11 +865,15 @@ public class Sequence<T> implements Monad<T> {
         );
     }
 
-    /**
+    /
+     * <i><b>NB!</b> Equal elements/values in this sequence will be omitted when transforming this sequence to a set-based monoid.</i>
+     *
      * @param binaryOperation associative and closed binary operation
      * @param identityElement identity element
      * @return a new monoid based on this sequence's elements (as the monoid set), and the given operation and identity element
-     */
+     * @deprecated Equal elements/values in this sequence will be omitted when transforming this sequence to a set-based monoid
+     /
+    @Deprecated // Equal elements/values in this sequence will be omitted when transforming this sequence to a set-based monoid
     public MonoidStructure<T> toMonoid(BinaryOperator<T> binaryOperation, T identityElement) {
         return toMonoid(
             identityElement,
@@ -682,17 +881,20 @@ public class Sequence<T> implements Monad<T> {
         );
     }
 
-    /**
+    /
      * <code>toMonoid</code> variant with swapped parameters.
-     */
+     *
+     * @deprecated Equal elements/values in this sequence will be omitted when transforming this sequence to a set-based monoid
+     /
+    @Deprecated // Equal elements/values in this sequence will be omitted when transforming this sequence to a set-based monoid
     public MonoidStructure<T> toMonoid(T identityElement, BinaryOperator<T> binaryOperation) {
         return new MonoidStructure<>(
             new LinkedHashSet<>(this.values),
-            //new LinkedHashSet<>(toJavaList()),
             binaryOperation,
             identityElement
         );
     }
+    */
 
 
     ///////////////////////////////////////////////////////
