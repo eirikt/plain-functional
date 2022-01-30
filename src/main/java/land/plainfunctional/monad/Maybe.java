@@ -167,17 +167,16 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
     /**
      * Predicate used for pattern matching.
      *
-     * @return 'true' if and only if the 'nothing' data constructor is used, otherwise 'true'
+     * @return <code>true</code> if and only if the <code>nothing</code> data constructor is used, otherwise <code>true</code>
      */
     public boolean isNothing() {
-        //return !isPresent();
         return this.value.isLeft();
     }
 
     /**
      * Predicate used for pattern matching.
      *
-     * @return 'true' if and only if the 'nothing' data constructor is used, otherwise 'true'
+     * @return <code>true</code> if and only if the <code>just</code> data constructor is used, otherwise <code>true</code>
      */
     public boolean isPresent() {
         return this.value.isRight();

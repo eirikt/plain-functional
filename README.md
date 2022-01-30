@@ -42,6 +42,47 @@ The Javadoc is all there is of documentation for the time being.
 
 ---
 
+### Integration
+You can use [JitPack](https://jitpack.io) to use _Plain functional_ in your Maven-based project.
+Add JitPack to your repositories:
+```xml
+<repositories>
+    ...
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+    ...
+</repositories>
+```
+And then you add it to your project dependencies:
+```xml
+<dependencies>
+    ...
+    <dependency>
+        <groupId>com.github.eirikt</groupId>
+        <artifactId>plain-functional</artifactId>
+        <version>0.2</version>
+    </dependency>
+    ...
+</dependencies>
+```
+
+Or for the truly bold:
+```xml
+<dependencies>
+    ...
+    <dependency>
+        <groupId>com.github.eirikt</groupId>
+        <artifactId>plain-functional</artifactId>
+        <version>master-SNAPSHOT</version>
+    </dependency>
+    ...
+</dependencies>
+```
+
+---
+
 ### Usage
 
 Build library artifact by:

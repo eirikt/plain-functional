@@ -475,10 +475,10 @@ public class Sequence<T> implements Monad<T> {
      * otherwise throw a {@link IllegalStateException} (a bottom value).
      *
      * <p>
-     * This is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
+     * This is a simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
      * </p>
      *
-     * @return this functor's value in case this is a 'Just'
+     * @return this functor's value in case this is a singleton value sequence, otherwise the provided failure nullary function will be applied
      * @see <a href="https://en.wikipedia.org/wiki/Singleton_(mathematics)">Singleton (mathematics)</a>
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
      */
@@ -491,11 +491,11 @@ public class Sequence<T> implements Monad<T> {
      * otherwise throw the given exception (a bottom value).
      *
      * <p>
-     * This is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
+     * This is a simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
      * </p>
      *
      * @param onAssertionFailure To be thrown if the assertion is invalid
-     * @return this functor's value in case this is a 'Just'
+     * @return this functor's value in case this is a singleton value sequence, otherwise the provided failure nullary function will be applied
      * @see <a href="https://en.wikipedia.org/wiki/Singleton_(mathematics)">Singleton (mathematics)</a>
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
      */
@@ -526,11 +526,11 @@ public class Sequence<T> implements Monad<T> {
      * otherwise throw a {@link IllegalStateException} (a bottom value).
      *
      * <p>
-     * This is a very simple application of <code>fold</code>.
+     * This is a simple application of <code>fold</code>.
      * </p>
      *
      * @param onAssertionFailureDefaultValueSupplier Will be returned if the assertion is invalid
-     * @return this functor's value in case this is a 'Just'
+     * @return this functor's value in case this is a singleton value sequence, otherwise the provided failure nullary function will be applied
      * @see <a href="https://en.wikipedia.org/wiki/Singleton_(mathematics)">Singleton (mathematics)</a>
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
      */
