@@ -48,15 +48,17 @@ Build library artifact by:
 ```cmd
 mvn package
 ```
-Then `JAR` file in `/target`
+Then a `JAR` file will be generated in `/target`
+
+All tests (formal specifications) will be executed as well.
 
 ...
 
-Generate Javadoc by:
+Build Javadoc by:
 ```cmd
 mvn javadoc:javadoc
 ```
-Then open `/target/site/apidocs/index.html`
+Then API documentation will be available in `/target/site/apidocs/`
 
 ---
 

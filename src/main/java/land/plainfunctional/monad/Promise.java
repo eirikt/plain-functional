@@ -178,9 +178,9 @@ public class Promise<T> implements Monad<T>, FunctorExtras<T>, Future<T> {
     ///////////////////////////////////////////////////////////////////////////
 
 
-    ///////////////////////////////////////////////////////////////////////////
-    // State
-    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////
+    // State & Constructors
+    ///////////////////////////////////////////////////////
 
     protected Supplier<T> valueSupplier;
     protected CompletableFuture<T> valueFuture;
@@ -193,11 +193,6 @@ public class Promise<T> implements Monad<T>, FunctorExtras<T>, Future<T> {
 
     protected List<Consumer<? super T>> onResolvedEffectList;
 
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Constructors
-    ///////////////////////////////////////////////////////////////////////////
-
     protected Promise(T resolvedValue) {
         Arguments.requireNotNull(resolvedValue, "'Promise' cannot handle null values");
         this.onResolvedEffectList = new CopyOnWriteArrayList<>();
@@ -207,40 +202,11 @@ public class Promise<T> implements Monad<T>, FunctorExtras<T>, Future<T> {
         }
     }
 
-    /*
-    protected Promise(T resolvedValue, List<Consumer<? super T>> onResolvedEffectList) {
-        Arguments.requireNotNull(resolvedValue, "'Promise' cannot handle null values");
-        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
-        if (onResolvedEffectList != null && !onResolvedEffectList.isEmpty()) {
-            if (!this.onResolvedEffectList.addAll(onResolvedEffectList)) {
-                System.err.printf("Promise(resolvedValue): Appending effects FAILED! [%s]", this);
-            }
-        }
-        resolve(resolvedValue);
-        if (DO_VERBOSE_LOGGING) {
-            System.out.printf("Promise(resolvedValue): Value (immediately) resolved: %s (thread \"%s\")%n", resolvedValue, Thread.currentThread().getName());
-        }
-    }
-    */
-
     protected Promise(Supplier<T> nullaryFunction) {
         Arguments.requireNotNull(nullaryFunction, "'Promise' cannot handle null functions");
         this.valueSupplier = nullaryFunction;
         this.onResolvedEffectList = new CopyOnWriteArrayList<>();
     }
-
-    /*
-    protected Promise(Supplier<T> nullaryFunction, List<Consumer<? super T>> onResolvedEffectList) {
-        Arguments.requireNotNull(nullaryFunction, "'Promise' cannot handle null suppliers");
-        this.valueSupplier = nullaryFunction;
-        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
-        if (onResolvedEffectList != null && !onResolvedEffectList.isEmpty()) {
-            if (!this.onResolvedEffectList.addAll(onResolvedEffectList)) {
-                System.err.printf("Promise(resolvedValue): Appending effects FAILED! [%s]", this);
-            }
-        }
-    }
-    */
 
     protected Promise(CompletableFuture<T> completableFuture) {
         Arguments.requireNotNull(completableFuture, "'Promise' cannot handle null futures");
@@ -254,26 +220,6 @@ public class Promise<T> implements Monad<T>, FunctorExtras<T>, Future<T> {
                 resolve(value);
             });
     }
-
-    /*
-    protected Promise(CompletableFuture<T> completableFuture, List<Consumer<? super T>> onResolvedEffectList) {
-        Arguments.requireNotNull(completableFuture, "'Promise' cannot handle null futures");
-        this.valueFuture = completableFuture;
-        this.onResolvedEffectList = new CopyOnWriteArrayList<>();
-        this.valueFuture.whenComplete(
-            (value, throwable) -> {
-                if (throwable != null) {
-                    throw new RuntimeException(throwable);
-                }
-                resolve(value);
-            });
-        if (onResolvedEffectList != null && !onResolvedEffectList.isEmpty()) {
-            if (!this.onResolvedEffectList.addAll(onResolvedEffectList)) {
-                System.err.printf("Promise(resolvedValue): Appending effects FAILED! [%s]", this);
-            }
-        }
-    }
-    */
 
 
     ///////////////////////////////////////////////////////////////////////////

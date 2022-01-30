@@ -82,8 +82,8 @@ public interface Monad<T> extends Applicative<T> {
      * </p>
      *
      * @param function The monad action
-     * @param <V>      The type of the codomain, hence the new value context, or just, the new functor type
-     * @param <M>      Monad-covariant type (of the new monad)
+     * @param <V>      The type of the codomain / the new functor type
+     * @param <M>      Monad-covariant type (of the new monad, or just, the new value context)
      * @return the new monad
      */
     //@SuppressWarnings("unchecked")

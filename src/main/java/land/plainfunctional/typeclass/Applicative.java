@@ -66,7 +66,7 @@ public interface Applicative<T> extends Functor<T> {
      * </p>
      *
      * @param functionInContext The (possibly curried and applied) function already in this functor context
-     * @param <V>               The type of the codomain, hence the new value context, or just, the new functor type
+     * @param <V>               The type of the codomain / the new functor type
      * @return the new applicative functor
      * @throws ClassCastException NB! If the type <code>A</code> is a "sibling type" of this applicative functor instance rather than the same or an extension of it (e.g. a <code>Maybe</code> applied to a <code>Sequence</code>)
      * @see <a href="https://en.wikipedia.org/wiki/Algebraic_structure">Algebraic structures</a>

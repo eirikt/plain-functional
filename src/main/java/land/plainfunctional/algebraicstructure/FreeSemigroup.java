@@ -71,7 +71,7 @@ public class FreeSemigroup<T> {
     }
 
     /**
-     * @return a curried version of this semigroup's associative, closed, binary operation
+     * @return a curried version of this semigroup's associative, closed, and binary operation
      */
     public Function<T, Function<T, T>> curriedBinaryOperation() {
         return
@@ -81,7 +81,7 @@ public class FreeSemigroup<T> {
     }
 
     /**
-     * Application of this semigroup's binary operation, •<br>
+     * Application of this semigroup's associative, closed, and binary operation, •<br>
      * This is an <i>endofunction</i>/<i>endomorphism</i>.
      *
      * <p>

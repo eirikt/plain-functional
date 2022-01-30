@@ -58,10 +58,9 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getRootCauseMess
  *
  * <p>
  * <i>Observation</i>:<br>
- * With the current implementation, use a {@link Promise} to accomplish everything a {@link Reader} can.
+ * With the current implementation, you can use a {@link Promise} to accomplish everything a {@link Reader} can.
  * If the semantics of {@link Reader} are not extended, the {@link Reader} class may be deprecated...
- * The fever core monads, the better!
- * Composition of well-defined monads is the goal.
+ * The fever core monads, the better! Composition of well-defined monads is the goal.
  * </p>
  *
  * @param <T> The type of the deferred value
@@ -147,16 +146,11 @@ public class Reader<T> implements Monad<T>, FunctorExtras<T>, Future<T> {
     ///////////////////////////////////////////////////////////////////////////
 
 
-    ///////////////////////////////////////////////////////////////////////////
-    // State
-    ///////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////
+    // State & Constructors
+    ///////////////////////////////////////////////////////
 
     protected Promise<T> promise;
-
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Constructors
-    ///////////////////////////////////////////////////////////////////////////
 
     protected Reader(Supplier<T> supplier) {
         Arguments.requireNotNull(supplier, "'Reader' cannot handle 'null' suppliers");

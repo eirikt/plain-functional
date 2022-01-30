@@ -123,11 +123,7 @@ public class MonoidStructure<T> extends FreeMonoid<T> {
      * @return the folded value
      */
     public T fold() {
-        T foldedValue = this.identityElement;
-        for (T value : this.set) {
-            foldedValue = append(foldedValue, value);
-        }
-        return foldedValue;
+        return toSequence().foldLeft(toFreeMonoid());
     }
 
     /**
