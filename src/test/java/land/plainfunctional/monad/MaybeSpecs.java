@@ -17,6 +17,7 @@ import land.plainfunctional.typeclass.Applicative;
 
 import static java.lang.Integer.sum;
 import static java.lang.String.format;
+import static java.util.function.Function.identity;
 import static land.plainfunctional.monad.Maybe.asMaybe;
 import static land.plainfunctional.monad.Maybe.just;
 import static land.plainfunctional.monad.Maybe.nothing;
@@ -38,6 +39,9 @@ class MaybeSpecs {
         Maybe<Integer> maybe3 = just(3);
 
         assertThat(maybe3.isNothing()).isFalse();
+        //assertThat(maybe3.hasValue()).isTrue();
+        assertThat(maybe3.isPresent()).isTrue();
+        //assertThat(maybe3.exists()).isTrue();
 
         assertThat(maybe3).isNotSameAs(just(3));
         assertThat(maybe3).isEqualTo(just(3));
@@ -292,7 +296,12 @@ class MaybeSpecs {
         assertThatThrownBy(
             () -> just("Three").apply(Sequence.of(appliedStringLength))
         ).isInstanceOf(ClassCastException.class)
-         .hasMessageContaining("land.plainfunctional.monad.Sequence cannot be cast to land.plainfunctional.monad.Maybe");
+         .hasMessageContaining("land.plainfunctional.monad.Sequence cannot be cast to ");
+
+        assertThatThrownBy(
+            () -> just("Three").apply(Sequence.of(appliedStringLength))
+        ).isInstanceOf(ClassCastException.class)
+         .hasMessageContaining("land.plainfunctional.monad.Maybe");
     }
 
     @Test
@@ -919,6 +928,16 @@ class MaybeSpecs {
     ///////////////////////////////////////////////////////////////////////////
 
     @Test
+    void getOrThrow_nothing() {
+        Maybe<String> maybe = of(null);
+
+        assertThatThrownBy(
+            () -> maybe.getOrThrow(() -> new IllegalStateException("CRASH!"))
+        ).isInstanceOf(IllegalStateException.class)
+         .hasMessageContaining("CRASH!");
+    }
+
+    @Test
     void shouldFoldViaPatternMatching_nothing() {
         Maybe<String> maybe = of(null);
 
@@ -928,7 +947,16 @@ class MaybeSpecs {
                      () -> -1,
                      (length) -> length
                  );
+        assertThat(stringLength).isEqualTo(-1);
 
+        stringLength = maybe
+            .map(String::length)
+            .fold(-1, identity());
+        assertThat(stringLength).isEqualTo(-1);
+
+        stringLength = maybe
+            .map(String::length)
+            .fold(-1, identity());
         assertThat(stringLength).isEqualTo(-1);
     }
 
@@ -947,7 +975,16 @@ class MaybeSpecs {
                      () -> -1,
                      (length) -> length
                  );
+        assertThat(stringLength).isEqualTo(5);
 
+        stringLength =
+            maybe.map(String::length)
+                 .fold(-1, identity());
+        assertThat(stringLength).isEqualTo(5);
+
+        stringLength =
+            maybe.map(String::length)
+                 .getOrDefault(-1);
         assertThat(stringLength).isEqualTo(5);
     }
 
@@ -1012,7 +1049,6 @@ class MaybeSpecs {
             (Supplier<Boolean>) nullSupplier,
             //nullBooleanSupplier,
 
-            //(Supplier<Boolean>) nullSupplier,
             TestFunctions::isEven
         );
         assertThat(isEven).isTrue();
@@ -1027,10 +1063,7 @@ class MaybeSpecs {
 
     @Test
     void shouldUseFoldAsLens() {
-        Person person = new Person();
-        person.name = "John";
-        person.gender = MALE;
-        person.birthDate = LocalDate.of(1980, 1, 10);
+        Person person = new Person("John", MALE, LocalDate.of(1980, 1, 10));
 
         Maybe<Person> maybePerson = just(person);
 
@@ -1040,16 +1073,34 @@ class MaybeSpecs {
         );
         assertThat(johnsBirthDate).isEqualTo(person.birthDate);
 
-        // Alternatively, the more "uglier"
-        johnsBirthDate = maybePerson.getOrDefault(Person.identity()).birthDate;
-        assertThat(johnsBirthDate).isEqualTo(person.birthDate);
+        // Alternatively, dangerous
+        LocalDate johnsBirthDateOrNull = maybePerson.getOrNull().birthDate;
+        assertThat(johnsBirthDateOrNull).isEqualTo(person.birthDate);
 
-        // Alternatively, the even more "uglier"
-        johnsBirthDate = maybePerson.getOrNull().birthDate;
-        assertThat(johnsBirthDate).isEqualTo(person.birthDate);
-
-        // Alternatively, the even even more "uglier"
+        // Alternatively, dangerous
         johnsBirthDate = maybePerson.tryGet().birthDate;
+        assertThat(johnsBirthDate).isEqualTo(person.birthDate);
+
+        // Alternatively, prettier
+        johnsBirthDateOrNull = maybePerson.fold((LocalDate) null, (p) -> p.birthDate);
+        assertThat(johnsBirthDateOrNull).isEqualTo(person.birthDate);
+
+        // Alternatively, even more prettier
+        johnsBirthDate = maybePerson.fold(LocalDate.MIN, Person::getBirthDate);
+        assertThat(johnsBirthDate).isEqualTo(person.birthDate);
+
+        // Alternatively, even even more prettier
+        johnsBirthDateOrNull = maybePerson.foldOrNull(Person::getBirthDate);
+        assertThat(johnsBirthDateOrNull).isEqualTo(person.birthDate);
+
+        // Alternatively, via monad, secure and verbose
+        //Maybe<LocalDate> maybeJohnsBirthDate = maybePerson.fold(Person::getBirthDate);
+        Maybe<LocalDate> maybeJohnsBirthDate = maybePerson.then((p) -> just(p.birthDate));
+        assertThat(maybeJohnsBirthDate.isNothing()).isFalse();
+        assertThat(maybeJohnsBirthDate.tryGet()).isEqualTo(person.birthDate);
+
+        // Alternatively, secure and verbose
+        johnsBirthDate = maybePerson.getOrDefault(Person.getIdentity()).birthDate;
         assertThat(johnsBirthDate).isEqualTo(person.birthDate);
     }
 }

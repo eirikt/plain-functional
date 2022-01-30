@@ -170,7 +170,17 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      * @return 'true' if and only if the 'nothing' data constructor is used, otherwise 'true'
      */
     public boolean isNothing() {
+        //return !isPresent();
         return this.value.isLeft();
+    }
+
+    /**
+     * Predicate used for pattern matching.
+     *
+     * @return 'true' if and only if the 'nothing' data constructor is used, otherwise 'true'
+     */
+    public boolean isPresent() {
+        return this.value.isRight();
     }
 
 
@@ -188,7 +198,9 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
         // It is also possible to implement homomorphism using a catamorphism.
         // Because here, the "catamorphism" is accidentally equal to a regular homomorphism...
         return fold(
-            Maybe::nothing,
+            () -> nothing(),
+            // What if the result of the mapping function is partial -> returns null?
+            // => Then you must use 'bind' before invoking this 'map', of course...
             (ignored) -> just(function.apply(this.value.tryGet()))
         );
     }
@@ -237,7 +249,8 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
             }
             // TODO: Verify type casting validity with tests, then mark with @SuppressWarnings("unchecked")
             // TODO: Well, also argue that this must be the case...
-            return (Maybe<T>) this.value;
+            //return (Maybe<T>) this.value;
+            throw new ClassCastException(format("Value in context is not a 'Maybe' (%s)", this.value.tryGet()));
         }
         return nothing();
     }
@@ -260,7 +273,7 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
 
     /**
      * Retrieve this {@link Maybe} functor's value if this is a 'Just',
-     * otherwise throw a {@link NullPointerException} (a bottom value).
+     * otherwise throw a {@link IllegalStateException} (a bottom value).
      *
      * <p>
      * This is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
@@ -270,11 +283,22 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
      */
     public T tryGet() {
-        return fold(
-            () -> { throw new NullPointerException(); },
-            // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
-            (ignored) -> this.value.tryGet()
-        );
+        return getOrThrow(IllegalStateException::new);
+    }
+
+    /**
+     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
+     * otherwise throw a provided {@link RuntimeException} (a bottom value).
+     *
+     * <p>
+     * This is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
+     * </p>
+     *
+     * @return this functor's value in case this is a 'Just'
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
+     */
+    public T getOrThrow(Supplier<? extends RuntimeException> runtimeExceptionSupplier) {
+        return getOr(() -> { throw runtimeExceptionSupplier.get(); });
     }
 
     /**
@@ -292,6 +316,32 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
         return getOrDefault(null);
     }
 
+    /* TODO: Useful?
+    public <V> V mapAndGetWithDefaultNull(Function<? super T, ? extends V> function) {
+        return mapAndGetWithDefault(function, null);
+    }
+
+    public <V> V mapAndGetWithDefault(Function<? super T, ? extends V> function, V defaultValue) {
+        Maybe<V> result = this.map(function);
+        return (result.isNothing()) ? defaultValue : result.tryGet();
+    }
+    */
+
+    /**
+     * Retrieve this {@link Maybe} functor's value if this is a 'Just',
+     * otherwise the given default value will be returned.
+     *
+     * <p>3
+     * This is a simple application of <code>fold</code>.
+     * </p>
+     *
+     * @param defaultValue The default value in case this is 'Nothing'
+     * @return this functor's value in case this is a 'Just'
+     */
+    public T getOrDefault(T defaultValue) {
+        return getOr(() -> defaultValue);
+    }
+
     /**
      * Retrieve this {@link Maybe} functor's value if this is a 'Just',
      * otherwise the given default value will be returned.
@@ -300,15 +350,119 @@ public class Maybe<T> extends AbstractProtectedValue<Either<?, T>> implements Mo
      * This is a simple application of <code>fold</code>.
      * </p>
      *
-     * @param defaultValue The default value in case this is 'Nothing'
+     * @param defaultValueSupplier The default value supplier in case this is 'Nothing'
      * @return this functor's value in case this is a 'Just'
      */
-    public T getOrDefault(T defaultValue) {
+    public T getOr(Supplier<T> defaultValueSupplier) {
         return fold(
-            () -> defaultValue,
+            defaultValueSupplier,
             // The 'ignored' bound parameter should obviously have been named '_' ("unit value"), but the Java compiler won't allow that
             (ignored) -> this.value.tryGet()
         );
+    }
+
+    /**
+     * To <i>fold</i> a value means creating a new representation of it.
+     *
+     * <p>
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
+     * </p>
+     *
+     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>
+     * As {@link Maybe} is a single-value functor, there is no need for a <i>binary</i> function;
+     * It is replaced by an unary function, which transforms the single <code>Just</code> value of this {@link Maybe}.
+     * Also, the need for an initial value is redundant;
+     * It is replaced by a special "nullary" function in case this {@link Maybe} is a <code>Nothing</code>.
+     * </p>
+     *
+     * @param onJust Function (unary) (the "catamorphism") to be applied to this functor's value in case it is a 'Just'
+     * @param <V>    The type of the folded/returning value
+     * @return the folded value
+     */
+    public <V> V foldOrNull(Function<? super T, ? extends V> onJust) {
+        return fold((V) null, onJust);
+    }
+
+    /*
+    // TODO: Hmm, this is regular 'bind', is it not?
+    public <V> Maybe<V> fold(
+        Function<? super T, ? extends V> onJust
+    ) {
+        return Maybe.of(foldOrNull(onJust));
+    }
+    */
+
+    // TODO: Verify Javadoc on this one
+
+    /**
+     * Alias of {@code fold}, with swapped parameters.
+     */
+    public <V> V fold(
+        V onNothingDefaultValue,
+        Function<? super T, ? extends V> onJust
+    ) {
+        return fold(() -> onNothingDefaultValue, onJust);
+    }
+
+    /**
+     * To <i>fold</i> a value means creating a new representation of it.
+     *
+     * <p>
+     * In abstract algebra, this is known as a <i>catamorphism</i>.
+     * A catamorphism deconstructs (destroys) data structures
+     * in contrast to the <i>homomorphic</i> <i>preservation</i> of data structures,
+     * and <i>isomorphisms</i> where one can <i>resurrect</i> the originating data structure.
+     * </p>
+     *
+     * "Plain functionally" (Haskell-style), "foldleft" (<code>foldl</code>) is defined as:
+     * <p>
+     * <code>
+     * &nbsp;&nbsp;&nbsp;&nbsp;foldl :: (b -&gt; a -&gt; b) -&gt; b -&gt; f a -&gt; b
+     * </code>
+     * </p>
+     *
+     * <p>
+     * <i>This means</i>: A binary function <code>b -&gt; a -&gt; b</code>,
+     * together with an initial value of type <code>b</code>,
+     * is applied to a functor <code>f</code> of type <code>a</code>,
+     * returning a new value of type<code>b</code>.
+     * </p>
+     *
+     * <p>
+     * As {@link Maybe} is a single-value functor, there is no need for a <i>binary</i> function;
+     * It is replaced by an unary function, which transforms the single <code>Just</code> value of this {@link Maybe}.
+     * Also, the need for an initial value is redundant;
+     * It is replaced by a special "nullary" function in case this {@link Maybe} is a <code>Nothing</code>.
+     * </p>
+     *
+     * @param onJust                Function (unary) (the "catamorphism") to be applied to this functor's value in case it is a 'Just'
+     * @param onNothingDefaultValue The default value in case it is 'Nothing'
+     * @param <V>                   The type of the folded/returning value
+     * @return the folded value
+     */
+    // TODO: Use 'map.getOrDefault()' instead
+    public <V> V fold(
+        Function<? super T, ? extends V> onJust,
+        V onNothingDefaultValue
+    ) {
+        return fold(() -> onNothingDefaultValue, onJust);
     }
 
     /**
