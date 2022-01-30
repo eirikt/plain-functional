@@ -467,8 +467,104 @@ public class Sequence<T> implements Monad<T> {
 
 
     ///////////////////////////////////////////////////////
+    // Special case: Singleton
+    ///////////////////////////////////////////////////////
+
+    /**
+     * Asserts this {@link Sequence} functor to be a <i>singleton</i>, and returns its single value,
+     * otherwise throw a {@link IllegalStateException} (a bottom value).
+     *
+     * <p>
+     * This is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
+     * </p>
+     *
+     * @return this functor's value in case this is a 'Just'
+     * @see <a href="https://en.wikipedia.org/wiki/Singleton_(mathematics)">Singleton (mathematics)</a>
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
+     */
+    public T trySingle() {
+        return trySingle(IllegalStateException::new);
+    }
+
+    /**
+     * Asserts this {@link Sequence} functor to be a <i>singleton</i>, and returns its single value,
+     * otherwise throw the given exception (a bottom value).
+     *
+     * <p>
+     * This is a very simple (and somewhat reckless and unforgiving) application of <code>fold</code>.
+     * </p>
+     *
+     * @param onAssertionFailure To be thrown if the assertion is invalid
+     * @return this functor's value in case this is a 'Just'
+     * @see <a href="https://en.wikipedia.org/wiki/Singleton_(mathematics)">Singleton (mathematics)</a>
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
+     */
+    public T trySingle(Supplier<RuntimeException> onAssertionFailure) {
+        return singleOr(() -> { throw onAssertionFailure.get(); });
+    }
+
+
+    /*
+    public Maybe<T> single() {
+        if (size() == 1) {
+            return just(this.values.get(0));
+        }
+        System.err.printf("Sequence does not contain a single element, rather %d - returning Nothing%n", values.size());
+        return nothing();
+        // TODO: Include 'Unit' concept?
+        / TODO: Try
+        T val = singleOr(() -> (T) getUnit());
+        return (isUnit(val))
+            ? nothing()
+            : just(val);
+        /
+    }
+    */
+
+    /**
+     * Asserts this {@link Sequence} functor to be a <i>singleton</i>, and returns its single value,
+     * otherwise throw a {@link IllegalStateException} (a bottom value).
+     *
+     * <p>
+     * This is a very simple application of <code>fold</code>.
+     * </p>
+     *
+     * @param onAssertionFailureDefaultValueSupplier Will be returned if the assertion is invalid
+     * @return this functor's value in case this is a 'Just'
+     * @see <a href="https://en.wikipedia.org/wiki/Singleton_(mathematics)">Singleton (mathematics)</a>
+     * @see <a href="https://en.wikipedia.org/wiki/Bottom_type">Bottom type</a>
+     */
+    public T singleOr(Supplier<T> onAssertionFailureDefaultValueSupplier) {
+        if (size() == 1) {
+            return this.values.get(0);
+        }
+        return onAssertionFailureDefaultValueSupplier.get();
+    }
+
+
+    ///////////////////////////////////////////////////////
     // Fold
     ///////////////////////////////////////////////////////
+
+    /**
+     * Same-type folding via a given monoid.
+     *
+     * @param freeMonoid The same-type monoid to be used for folding this sequence
+     * @return the folded value
+     */
+    public T foldLeft(FreeMonoid<T> freeMonoid) {
+        return foldLeft(
+            freeMonoid.identityElement,
+            freeMonoid.binaryOperation
+        );
+    }
+
+    /**
+     * <code>foldLeft</code> variant with swapped parameters.
+     */
+    public <V> V foldLeft(BiFunction<V, ? super T, ? extends V> catamorphism, V identityValue) {
+        return foldLeft(identityValue, catamorphism);
+    }
 
     /**
      * <p>
@@ -509,13 +605,6 @@ public class Sequence<T> implements Monad<T> {
      * @param <V>           The type of the folded/returning value
      * @return the folded value
      */
-    public <V> V foldLeft(BiFunction<V, ? super T, ? extends V> catamorphism, V identityValue) {
-        return foldLeft(identityValue, catamorphism);
-    }
-
-    /**
-     * <code>foldLeft</code> variant with swapped parameters.
-     */
     public <V> V foldLeft(V identityValue, BiFunction<V, ? super T, ? extends V> catamorphism) {
         V foldedValue = identityValue;
         for (T value : this.values) {
@@ -523,6 +612,24 @@ public class Sequence<T> implements Monad<T> {
         }
         return foldedValue;
     }
+
+    /**
+     * Same-type folding via a given monoid.
+     *
+     * @param freeMonoid The same-type monoid to be used for folding this sequence
+     * @return the folded value
+     */
+    public T foldRight(FreeMonoid<T> freeMonoid) {
+        return foldRight(freeMonoid.identityElement, freeMonoid.binaryOperation);
+    }
+
+    /**
+     * <code>foldRight</code> variant with swapped parameters.
+     */
+    public <V> V foldRight(BiFunction<? super T, V, ? extends V> catamorphism, V identityValue) {
+        return foldRight(identityValue, catamorphism);
+    }
+
 
     /**
      * <p>
@@ -562,13 +669,6 @@ public class Sequence<T> implements Monad<T> {
      * @param catamorphism  The fold function
      * @param <V>           The type of the folded/returning value
      * @return the folded value
-     */
-    public <V> V foldRight(BiFunction<? super T, V, ? extends V> catamorphism, V identityValue) {
-        return foldRight(identityValue, catamorphism);
-    }
-
-    /**
-     * <code>foldRight</code> variant with swapped parameters.
      */
     public <V> V foldRight(V identityValue, BiFunction<? super T, V, ? extends V> catamorphism) {
         V foldedValue = identityValue;
@@ -692,7 +792,7 @@ public class Sequence<T> implements Monad<T> {
         return promiseSequence
             .map(
                 // NB! Blocks current thread while completing promise evaluation, one by one
-                promise -> promise.fold(
+                (promise) -> promise.fold(
                     // When bottom value:
                     (exception) -> {
                         // Partial function handling I:
@@ -750,10 +850,42 @@ public class Sequence<T> implements Monad<T> {
      * @return a new sequence, consisting of the first sequence's elements followed by the second sequences' elements
      */
     public static <T> Sequence<T> append(Sequence<T> sequence1, Sequence<T> sequence2) {
+        // TODO: Deliberately implemented with primary focus of readability/consistency, and not efficiency
+
+        // TODO: Include 'Unit' concept?
+        /*
+        // NB! Removal of all unit/void values
+        // => java.lang.StackOverflowError
+        //sequence1 = sequence1.remove((value) -> value instanceof Unit);
+        //sequence2 = sequence2.remove((value) -> value instanceof Unit);
+
+        List<T> javaList1 = sequence1.toJavaList();
+        javaList1.removeIf((value) -> value instanceof Unit);
+        sequence1 = new Sequence<>(javaList1);
+
+        List<T> javaList2 = sequence2.toJavaList();
+        javaList2.removeIf((value) -> value instanceof Unit);
+        sequence2 = new Sequence<>(javaList2);
+        // /Removal of all unit/void values
+        */
+
         List<T> appendedList = sequence1.toJavaList();
         appendedList.addAll(sequence2.values);
 
         return new Sequence<>(appendedList);
+        /*
+        List<T> javaList1 = sequence1.toJavaList();
+        javaList1.removeIf((value) -> value instanceof Unit);
+        sequence1 = new Sequence<>(javaList1);
+
+        List<T> javaList2 = sequence2.toJavaList();
+        javaList2.removeIf((value) -> value instanceof Unit);
+        sequence2 = new Sequence<>(javaList2);
+
+        javaList1.addAll(javaList2);
+
+        return new Sequence<>(javaList1);
+        */
     }
 
 

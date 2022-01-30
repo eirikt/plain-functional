@@ -2,7 +2,6 @@ package land.plainfunctional.monad;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -96,17 +95,14 @@ class SequenceSpecs {
 
     @Test
     void shouldBeParametricPolymorphicCovariant() {
-        Person person = new Person();
-        person.name = "Paul";
+        Person person = new Person("Paul");
 
-        Customer customer = new Customer();
-        customer.name = "Chris";
+        Customer customer = new Customer("Chris");
 
-        Customer customer2 = new Customer();
-        customer2.name = "Chrissie";
+        Customer customer2 = new Customer("Chrissie");
 
         VipCustomer vipCustomer = new VipCustomer();
-        vipCustomer.vipCustomerSince = OffsetDateTime.now();
+        //vipCustomer.vipCustomerSince = OffsetDateTime.now();
 
         Sequence<Person> sequence = Sequence.of(person, customer);
 
@@ -118,7 +114,7 @@ class SequenceSpecs {
 
         Person foldedPerson = sequence2.foldLeft(
             (person1, person2) -> person2,
-            Person.identity()
+            Person.getIdentity()
         );
         assertThat(foldedPerson).isNotNull();
         assertThat(foldedPerson).isInstanceOf(Person.class);
@@ -309,7 +305,15 @@ class SequenceSpecs {
                           .apply(just(curriedPlus.apply(3)))
                           .apply(just(curriedPlus.apply(4)))
         ).isInstanceOf(ClassCastException.class)
-         .hasMessageContaining("land.plainfunctional.monad.Maybe cannot be cast to land.plainfunctional.monad.Sequence");
+         .hasMessageContaining("land.plainfunctional.monad.Maybe cannot be cast to ");
+
+        assertThatThrownBy(
+            () -> Sequence.of(1)
+                          .apply(just(curriedPlus.apply(2)))
+                          .apply(just(curriedPlus.apply(3)))
+                          .apply(just(curriedPlus.apply(4)))
+        ).isInstanceOf(ClassCastException.class)
+         .hasMessageContaining("land.plainfunctional.monad.Sequence");
     }
 
     @Test
@@ -1259,6 +1263,44 @@ class SequenceSpecs {
 
 
     ///////////////////////////////////////////////////////////////////////////
+    // Singleton semantics
+    ///////////////////////////////////////////////////////////////////////////
+
+    @Test
+    void shouldExtractSingleElementFromSingletonSequence_1() {
+        Sequence<String> singletonSequence = Sequence.of("one");
+
+        assertThat(singletonSequence.trySingle()).isSameAs("one");
+    }
+
+    @Test
+    void shouldExtractSingleElementFromSingletonSequence_2() {
+        Sequence<String> singletonSequence = Sequence.of("one");
+
+        assertThat(singletonSequence.singleOr(
+            () -> format("No a singleton, silly - got %d elements, damnit!", singletonSequence.size()))
+        ).isEqualTo("one");
+    }
+
+    @Test
+    void whenTryingToExtractSingleElementFromNotSingletonSequence_shouldThrowException_1() {
+        Sequence<String> singletonSequence = Sequence.of("one", "two");
+
+        assertThatThrownBy(singletonSequence::trySingle)
+            .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void whenTryingToExtractSingleElementFromNotSingletonSequence_shouldThrowException_2() {
+        Sequence<String> singletonSequence = Sequence.of("one", "two");
+
+        assertThat(singletonSequence.singleOr(
+            () -> format("No a singleton, silly - got %d elements, damnit!", singletonSequence.size()))
+        ).isEqualTo("No a singleton, silly - got 2 elements, damnit!");
+    }
+
+
+    ///////////////////////////////////////////////////////////////////////////
     // Fold (catamorphism) semantics
     ///////////////////////////////////////////////////////////////////////////
 
@@ -1336,17 +1378,14 @@ class SequenceSpecs {
     // TODO: Keep?
     @Test
     void should__() {
-        Person person = new Person();
-        person.name = "Paul";
+        Person person = new Person("Paul");
 
-        Customer customer = new Customer();
-        customer.name = "Chris";
+        Customer customer = new Customer("Chris");
 
-        Customer customer2 = new Customer();
-        customer2.name = "Chrissie";
+        Customer customer2 = new Customer("Chrissie");
 
         VipCustomer vipCustomer = new VipCustomer();
-        vipCustomer.vipCustomerSince = OffsetDateTime.now();
+        //vipCustomer.vipCustomerSince = OffsetDateTime.now();
 
 
         Sequence<Person> sequence = Sequence.of(person, customer, customer2, vipCustomer);
@@ -1408,20 +1447,17 @@ class SequenceSpecs {
     }
 
     // TODO: Keep?
+    /*
     @Test
     void should___() {
-        Person person = new Person();
-        person.name = "Paul";
+        Person person = new Person("Paul");
 
-        Customer customer = new Customer();
-        customer.name = "Chris";
+        Customer customer = new Customer("Chris");
 
-        Customer customer2 = new Customer();
-        customer2.name = "Chrissie";
+        Customer customer2 = new Customer("Chrissie");
 
-        VipCustomer vipCustomer = new VipCustomer();
-        vipCustomer.name = "William III";
-        vipCustomer.vipCustomerSince = OffsetDateTime.now();
+        VipCustomer vipCustomer = new VipCustomer("William III");
+        //vipCustomer.vipCustomerSince = OffsetDateTime.now();
 
 
         Sequence<Person> sequence = Sequence.of(person, customer, customer2, vipCustomer);
@@ -1455,7 +1491,7 @@ class SequenceSpecs {
         );
         assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
 
-        foldedSequence = sequence.parallelFold(new FreeMonoid<>(Person::append, Person.identity()));
+        foldedSequence = sequence.parallelFold(new FreeMonoid<>(Person::append, Person.getIdentity()));
         assertThat(foldedSequence.name).isEqualTo("Paul"); // Folded left-wise
 
 
@@ -1464,7 +1500,7 @@ class SequenceSpecs {
         //assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
 
         foldedSequence = sequence.foldRight(
-            Person.identity(),
+            Person.getIdentity(),
             (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append)
         );
         assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
@@ -1476,10 +1512,11 @@ class SequenceSpecs {
 
         foldedSequence = sequence.foldRight(
             (person2Append, accumulatedPerson) -> accumulatedPerson.append(person2Append),
-            Person.identity()
+            Person.getIdentity()
         );
         assertThat(foldedSequence.name).isEqualTo("William III"); // Folded right-wise ("backwards")
     }
+    */
 
 
     ///////////////////////////////////////////////////////////////////////////
