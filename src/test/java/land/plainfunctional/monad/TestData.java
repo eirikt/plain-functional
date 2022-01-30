@@ -291,7 +291,7 @@ public class TestData {
 
     // See: https://en.wikipedia.org/wiki/Comma-separated_values
     public static final Function<String, FreeMonoid<String>> CSV_MONOID_FUNCTION =
-        separator ->
+        (separator) ->
             new FreeMonoid<>(
                 (string1, string2) -> isBlank(string2) ? string1 : string1 + separator + string2,
                 ""
@@ -300,4 +300,35 @@ public class TestData {
     // See: https://en.wikipedia.org/wiki/Comma-separated_values
     public static final FreeMonoid<String> CSV_MONOID =
         CSV_MONOID_FUNCTION.apply(", ");
+
+    // NB! Null-valued identity elements not allowed for monoids
+    //public static final FreeMonoid<Void> SYSTEM_OUT_MONOID_VOID =
+    //    new FreeMonoid<>(
+    //        (string1, string2) -> {
+    //            System.out.println(string2);
+    //            return null;
+    //        }
+    //        , null
+    //    );
+
+    public static final FreeMonoid<String> SYSTEM_OUT_MONOID_STRING =
+        new FreeMonoid<>(
+            (string1, string2) -> {
+                System.out.println(string2);
+                return "";
+            }
+            , ""
+        );
+
+    // TODO: Include 'Unit' concept?
+    /*
+    public static final FreeMonoid<Unit> SYSTEM_OUT_MONOID_UNIT =
+        new FreeMonoid<>(
+            (string1, string2) -> {
+                System.out.println(string2);
+                return UNIT;
+            }
+            , UNIT
+        );
+    */
 }
