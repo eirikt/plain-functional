@@ -1,41 +1,116 @@
 package land.plainfunctional.testdomain.vanillaecommerce;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Set;
 
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
+import land.plainfunctional.Immutable;
 
-// TODO: Make immutable
-public class Customer extends Person implements Cloneable {
+@Immutable
+public class Customer extends Person {
 
     private static final Customer IDENTITY = new Customer();
 
-    public OffsetDateTime membershipDate;
+    /**
+     * Customer identification.
+     */
+    @Immutable
+    public final String customerId;
 
-    public String customerId;             // Username (identifies the user)
-    // TODO: Move to the top
-    public String sessionId;              // Identifies the computer session
-    // TODO: Needed? Maybe the 'entityId' serves as authentication token?
-    public String authenticationToken;    // Proof of user authentication
+    /**
+     * Customer authentication.
+     */
+    @Immutable
+    public final String authenticationToken;
 
-    public Customer enlistedBy;
-    public Set<Customer> enlistedCustomers;
+    @Immutable
+    public final OffsetDateTime membershipFromDate;
+
+    @Immutable
+    public final OffsetDateTime membershipToDate;
+
+    @Immutable
+    public final Customer enlistedBy;
+
+    @Immutable
+    public final Set<Customer> enlistedCustomers;
+
+    public Customer() {
+        super(null);
+        this.customerId = null;
+        this.authenticationToken = null;
+        this.membershipFromDate = null;
+        this.membershipToDate = null;
+        this.enlistedBy = null;
+        this.enlistedCustomers = null;
+    }
+
+    public Customer(String name) {
+        super(name);
+        this.customerId = null;
+        this.authenticationToken = null;
+        this.membershipFromDate = null;
+        this.membershipToDate = null;
+        this.enlistedBy = null;
+        this.enlistedCustomers = null;
+    }
+
+    public Customer(String name, String customerId) {
+        super(name);
+        this.customerId = customerId;
+        this.authenticationToken = null;
+        this.membershipFromDate = null;
+        this.membershipToDate = null;
+        this.enlistedBy = null;
+        this.enlistedCustomers = null;
+    }
+
+    public Customer(
+        String entityId,
+        OffsetDateTime entityCreateTime,
+        OffsetDateTime entityLastModifyTime,
+        String name,
+        Gender gender,
+        LocalDate birthDate,
+        String customerId,
+        String authenticationToken,
+        OffsetDateTime membershipFromDate,
+        OffsetDateTime membershipToDate,
+        Customer enlistedBy,
+        Set<Customer> enlistedCustomers
+    ) {
+        super(entityId, entityCreateTime, entityLastModifyTime, name, gender, birthDate);
+        this.customerId = customerId;
+        this.authenticationToken = authenticationToken;
+        this.membershipFromDate = membershipFromDate;
+        this.membershipToDate = membershipToDate;
+        this.enlistedBy = enlistedBy;
+        this.enlistedCustomers = enlistedCustomers;
+    }
 
     public Customer append(Customer customer) {
-        Customer mergedCustomer = (Customer) super.append(customer);
-
-        mergedCustomer.membershipDate = this.membershipDate != null ? this.membershipDate : customer.membershipDate;
-        mergedCustomer.customerId = isNotBlank(this.customerId) ? this.customerId : customer.customerId;
-        mergedCustomer.sessionId = isNotBlank(this.sessionId) ? this.sessionId : customer.sessionId;
-        mergedCustomer.authenticationToken = isNotBlank(this.authenticationToken) ? this.authenticationToken : customer.authenticationToken;
-        mergedCustomer.enlistedBy = this.enlistedBy != null ? this.enlistedBy : customer.enlistedBy;
-        mergedCustomer.enlistedCustomers = this.enlistedCustomers != null ? this.enlistedCustomers : customer.enlistedCustomers;
-
-        return mergedCustomer;
+        throw new UnsupportedOperationException();
+        /*
+        return new Customer(
+            this.entityId.toString(),
+            this.entityCreateTime,
+            now(),
+            isNotBlank(this.name) ? this.name : customer.name,
+            (this.gender != null) ? this.gender : customer.gender,
+            (this.birthDate != null) ? this.birthDate : customer.birthDate,
+            (this.customerId != null) ? this.customerId : customer.customerId,
+            (this.authenticationToken != null) ? this.authenticationToken : customer.authenticationToken,
+            (this.membershipFromDate != null) ? this.membershipFromDate : customer.membershipFromDate,
+            (this.membershipToDate != null) ? this.membershipToDate : customer.membershipToDate,
+            (this.enlistedBy != null) ? this.enlistedBy : customer.enlistedBy,
+            (this.enlistedCustomers != null) ? this.enlistedCustomers : customer.enlistedCustomers
+        );
+        */
     }
 
-    @Override
-    public Customer clone() throws CloneNotSupportedException {
-        return (Customer) super.clone();
-    }
+    //@Override
+    //public Customer clone() throws CloneNotSupportedException {
+    //    throw new UnsupportedOperationException();
+    //    //return (Customer) super.clone();
+    //}
 }

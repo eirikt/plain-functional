@@ -7,6 +7,7 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 
 import land.plainfunctional.util.Arguments;
 
+import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 public class Address {
@@ -99,6 +100,27 @@ public class Address {
             false,
             true,
             Object.class
+        );
+    }
+
+    /**
+     * Equal to <code>toString</code>, except for Java object references, which are omitted.
+     */
+    public String toValueString() {
+        return format(
+            "%s[streetLine=%s, postalCode=%s, postalLocation=%s, country=%s]",
+            this.getClass().getName(),
+            this.streetLine, this.postalCode, this.postalLocation, this.country
+        );
+    }
+
+    /**
+     * Partial <code>toString</code>. Java object references are omitted.
+     */
+    public String toShortValueString() {
+        return format(
+            "%s, %s %s",
+            this.streetLine, this.postalCode, this.postalLocation
         );
     }
 }

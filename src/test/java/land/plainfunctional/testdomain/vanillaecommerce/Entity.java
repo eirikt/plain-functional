@@ -43,15 +43,7 @@ public interface Entity {
     /**
      * @return <code>true</code> if this entity is modified (after its creation)
      */
-    boolean isModified();
-
-    /**
-     * @return the time of destruction, or <code>null</code> if still an active/valid entity
-     */
-    OffsetDateTime entityDestroyTime();
-
-    /**
-     * @return <code>true</code> if this entity is marked as "destroyed"/archived/deactivated/invalidated and should not be used anymore
-     */
-    boolean isDestroyed();
+    default boolean isModified() {
+        return !entityLastModifyTime().equals(entityCreateTime());
+    }
 }

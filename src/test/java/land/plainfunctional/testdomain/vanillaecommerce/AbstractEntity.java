@@ -7,21 +7,30 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 
+import land.plainfunctional.Immutable;
+
 /**
  * Abstract class for <i>entity objects</i>,
  * providing consistent <code>hashCode</code> and <code>equals</code> methods based on the entity id.
  * A reflection-based <code>toString</code> methods listing all state, is also included.
  */
+@Immutable
 public abstract class AbstractEntity implements Entity {
 
+    @Immutable
     protected final OffsetDateTime entityCreateTime;
 
-    protected OffsetDateTime entityLastModifyTime;
-    protected OffsetDateTime entityDestroyTime;
+    @Immutable
+    protected final OffsetDateTime entityLastModifyTime;
 
     protected AbstractEntity() {
         this.entityCreateTime = OffsetDateTime.now();
         this.entityLastModifyTime = this.entityCreateTime;
+    }
+
+    protected AbstractEntity(OffsetDateTime entityCreateTime, OffsetDateTime entityLastModifyTime) {
+        this.entityCreateTime = entityCreateTime;
+        this.entityLastModifyTime = entityLastModifyTime;
     }
 
     @Override
@@ -32,21 +41,6 @@ public abstract class AbstractEntity implements Entity {
     @Override
     public OffsetDateTime entityLastModifyTime() {
         return this.entityLastModifyTime;
-    }
-
-    @Override
-    public boolean isModified() {
-        return !this.entityLastModifyTime.equals(this.entityCreateTime);
-    }
-
-    @Override
-    public OffsetDateTime entityDestroyTime() {
-        return this.entityDestroyTime;
-    }
-
-    @Override
-    public boolean isDestroyed() {
-        return this.entityDestroyTime != null;
     }
 
     @Override
